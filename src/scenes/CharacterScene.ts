@@ -82,7 +82,6 @@ export class CharacterScene extends Phaser.Scene {
       c.add(text(this, 24, 226 + i * 16, k, 'M', UI.dim));
       c.add(text(this, 188, 226 + i * 16, v, 'M', i === 2 ? UI.gold : UI.text).setOrigin(1, 0));
     });
-    c.add(text(this, 106, 278, `평타: ${a.basicName}`, 'S', UI.dim).setOrigin(0.5, 0));
     const icons = [...Save.d.slots, Save.d.ult];
     icons.forEach((id, i) => {
       const x = 46 + i * 40, y = 300;
@@ -204,7 +203,7 @@ export class CharacterScene extends Phaser.Scene {
     const c = this.content;
     const ids = [...Save.d.slots, Save.d.ult];
     const keys = ['A', 'S', 'D', 'F (궁극기)'];
-    c.add(text(this, 222, 86, '슬롯을 고른 뒤 아래에서 스킬을 선택하세요. 보유한 모든 능력의 스킬을 섞어 편성할 수 있어요.', 'S', UI.dim).setWordWrapWidth(400));
+    c.add(text(this, 222, 86, '슬롯을 고르고 아래에서 스킬을 선택하세요. 능력끼리 섞어서 편성 가능!', 'S', UI.dim));
     ids.forEach((id, i) => {
       const x = 262 + i * 70 + (i === 3 ? 20 : 0), y = 134;
       const sel = this.slotSel === i;

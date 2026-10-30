@@ -50,7 +50,7 @@ export class Boss extends Enemy {
 export class BigSprout extends Boss {
   summoned = false;
   constructor(bs: BattleScene, x: number, lv: number) {
-    super(bs, 'bigsprout', x, 'en_sprout', Math.round(760 * (1 + 0.22 * (lv - 1))), 15, 18, 18, '거대 새싹 대장');
+    super(bs, 'bigsprout', x, 'en_sprout', Math.round(620 * (1 + 0.22 * (lv - 1))), 13, 18, 18, '거대 새싹 대장');
     this.spr.setScale(2.4);
     this.body.setSize(18, 18).setOffset(5, 10);
     this.spr.play('sprout_walk');

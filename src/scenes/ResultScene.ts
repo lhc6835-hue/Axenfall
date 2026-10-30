@@ -65,7 +65,7 @@ export class ResultScene extends Phaser.Scene {
     if (d.win && next) btns.push(new Button(this, W / 2 + 140, by, '다음 스테이지 ▶', () => this.leave('Battle', { stageId: next.id }), { w: 130, gold: true, sound: 'confirm' }));
     else if (!d.win) btns.push(new Button(this, W / 2 + 140, by, '캐릭터 강화', () => this.leave('Character', {}), { w: 120, gold: true }));
     else btns.push(new Button(this, W / 2 + 140, by, '월드 맵', () => this.leave('World', {}), { w: 120, gold: true }));
-    btns.forEach((b, i) => { b.setAlpha(0); this.tweens.add({ targets: b, alpha: 1, y: { from: by + 20, to: by }, delay: 1800 + i * 100, duration: 300, ease: 'Back.easeOut' }); });
+    btns.forEach((b, i) => { b.setAlpha(0); this.tweens.add({ targets: b, alpha: 1, y: { from: by + 20, to: by }, delay: 1200 + i * 100, duration: 300, ease: 'Back.easeOut' }); });
     letters.length = 0;
   }
 
