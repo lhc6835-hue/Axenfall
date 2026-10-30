@@ -133,7 +133,7 @@ export class Player implements Fighter {
 
     if (this.state === 'attack') {
       this.stateT -= dt;
-      if (take('attack')) this.comboQueued = true;
+      if (take('attack') || this.bs.attackHeld) this.comboQueued = true;
       body.setVelocityX(body.velocity.x * 0.86);
       if (this.stateT <= 0) {
         if (this.comboQueued) { this.comboQueued = false; this.basic(); }
@@ -142,7 +142,7 @@ export class Player implements Fighter {
       return;
     }
 
-    if (take('attack')) { this.basic(); return; }
+    if (take('attack') || this.bs.attackHeld) { this.basic(); return; }
 
     // movement
     const accel = ground ? 1400 : 1000;

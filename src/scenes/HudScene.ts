@@ -42,14 +42,14 @@ export class HudScene extends Phaser.Scene {
     this.ultBar = this.add.graphics();
     // ----- skills (bottom centre)
     const ids: (string | null)[] = [...p.slots, p.ultId];
-    const keys = ['A', 'S', 'D', 'F'];
+    const keys = ['Q', 'E', 'R', 'F'];
     const sx = W / 2 - (4 * 40) / 2 + 20;
-    this.add.nineslice(W / 2, H - 26, 'ui_panel', undefined, 4 * 40 + 52, 46, 8, 8, 8, 8).setAlpha(0.92);
-    const basic = this.add.container(sx - 44, H - 28);
-    basic.add([this.add.nineslice(0, 0, 'ui_slot', undefined, 30, 30, 6, 6, 6, 6), this.add.image(0, 0, 'ic_basic_' + a.id).setScale(0.86), outlined(this, 0, 13, 'X', 'S', UI.dim).setOrigin(0.5, 0)]);
+    this.add.nineslice(W / 2, H - 30, 'ui_panel', undefined, 4 * 40 + 52, 46, 8, 8, 8, 8).setAlpha(0.92);
+    const basic = this.add.container(sx - 44, H - 33);
+    basic.add([this.add.nineslice(0, 0, 'ui_slot', undefined, 30, 30, 6, 6, 6, 6), this.add.image(0, 0, 'ic_basic_' + a.id).setScale(0.86), outlined(this, 0, 13, '클릭', 'S', UI.dim).setOrigin(0.5, 0)]);
     basic.setScale(0.85);
     ids.forEach((id, i) => {
-      const x = sx + i * 40 + (i === 3 ? 6 : 0), y = H - 28;
+      const x = sx + i * 40 + (i === 3 ? 6 : 0), y = H - 33;
       const cont = this.add.container(x, y);
       const frame = this.add.nineslice(0, 0, i === 3 ? 'ui_panelGold' : 'ui_slot', undefined, 34, 34, 6, 6, 6, 6);
       cont.add(frame);
@@ -92,9 +92,9 @@ export class HudScene extends Phaser.Scene {
   }
 
   controlsHint() {
-    const lines = ['← → 이동   C/Space 점프 (2단)   X 공격   Z/Shift 대시', 'A S D 스킬   F 궁극기 (게이지 100%)   ↓+점프 발판 내려가기   ESC 일시정지'];
+    const lines = ['A D 이동   W·Space 점프 (2단)   마우스 왼쪽 클릭 공격 (꾹 누르면 연속)   Shift 대시', 'Q E R 스킬   F 궁극기 (게이지 100%)   S+점프 발판 내려가기   ESC 일시정지'];
     const c = this.add.container(W / 2, 92);
-    const bg = this.add.nineslice(0, 0, 'ui_panel', undefined, 470, 40, 8, 8, 8, 8).setAlpha(0.9);
+    const bg = this.add.nineslice(0, 0, 'ui_panel', undefined, 620, 40, 8, 8, 8, 8).setAlpha(0.9);
     c.add(bg);
     lines.forEach((l, i) => c.add(text(this, 0, -9 + i * 14, l, 'S', i ? UI.dim : UI.text).setOrigin(0.5)));
     this.tweens.add({ targets: c, alpha: 0, delay: 9000, duration: 800, onComplete: () => c.destroy() });

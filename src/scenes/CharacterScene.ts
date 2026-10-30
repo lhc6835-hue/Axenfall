@@ -202,7 +202,7 @@ export class CharacterScene extends Phaser.Scene {
   drawSkills() {
     const c = this.content;
     const ids = [...Save.d.slots, Save.d.ult];
-    const keys = ['A', 'S', 'D', 'F (궁극기)'];
+    const keys = ['Q', 'E', 'R', 'F (궁극기)'];
     c.add(text(this, 222, 86, '슬롯을 고르고 아래에서 스킬을 선택하세요. 능력끼리 섞어서 편성 가능!', 'S', UI.dim));
     ids.forEach((id, i) => {
       const x = 262 + i * 70 + (i === 3 ? 20 : 0), y = 134;

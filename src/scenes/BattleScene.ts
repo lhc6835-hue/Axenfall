@@ -120,14 +120,18 @@ export class BattleScene extends Phaser.Scene {
     const K = Phaser.Input.Keyboard.KeyCodes;
     const k2 = (...codes: number[]) => codes.map((c) => kb.addKey(c, true, false));
     this.keys = {
-      left: k2(K.LEFT), right: k2(K.RIGHT), up: k2(K.UP), down: k2(K.DOWN),
-      jump: k2(K.C, K.SPACE, K.UP), attack: k2(K.X), dash: k2(K.Z, K.SHIFT),
-      s1: k2(K.A), s2: k2(K.S), s3: k2(K.D), ult: k2(K.F),
+      left: k2(K.A, K.LEFT), right: k2(K.D, K.RIGHT), up: k2(K.W, K.UP), down: k2(K.S, K.DOWN),
+      jump: k2(K.W, K.SPACE, K.UP), attack: [], dash: k2(K.SHIFT),
+      s1: k2(K.Q), s2: k2(K.E), s3: k2(K.R), ult: k2(K.F),
     };
     // buffered presses: a tap is never lost even if pressed and released within one frame
     const codeToAction = new Map<number, keyof Keys>();
     (Object.keys(this.keys) as (keyof Keys)[]).forEach((a) => this.keys[a].forEach((key) => { if (!codeToAction.has(key.keyCode) || a === 'jump') codeToAction.set(key.keyCode, a); }));
     codeToAction.set(K.UP, 'jump');
+    codeToAction.set(K.W, 'jump');
+    // basic attack = left mouse button (holding it keeps the combo going)
+    this.input.mouse?.disableContextMenu();
+    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => { if (p.leftButtonDown()) this.buf.set('attack', this.time.now); });
     this.buf.clear();
     kb.on('keydown', (e: KeyboardEvent) => { if (e.repeat) return; const a = codeToAction.get(e.keyCode); if (a) this.buf.set(a, this.time.now); });
     kb.on('keydown-ESC', () => this.pauseGame());
@@ -154,6 +158,8 @@ export class BattleScene extends Phaser.Scene {
   peek(a: keyof Keys) { const t = this.buf.get(a); return t !== undefined && this.time.now - t < 160; }
   /** Consumes a buffered press. */
   take(a: keyof Keys) { const ok = this.peek(a); this.buf.delete(a); return ok; }
+  /** Left mouse button currently held. */
+  get attackHeld() { const p = this.input.activePointer; return p.isDown && p.leftButtonDown(); }
 
   hitstop(ms: number) { if (ms > 0) this.stopUntil = Math.max(this.stopUntil, this.time.now + ms); }
 
