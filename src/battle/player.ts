@@ -123,7 +123,8 @@ export class Player implements Fighter {
     }
 
     // ---- input
-    const L = down(k.left), R = down(k.right);
+    const t = this.bs.touch;
+    const L = down(k.left) || t.dx < -0.3, R = down(k.right) || t.dx > 0.3;
     const moveDir = (R ? 1 : 0) - (L ? 1 : 0);
 
     const take = (a: keyof Keys) => this.bs.take(a);
@@ -155,11 +156,11 @@ export class Player implements Fighter {
       const f = ground ? 0.72 : 0.92;
       body.setVelocityX(Math.abs(body.velocity.x) < 8 ? 0 : body.velocity.x * f);
     }
-    if (!down(k.down) && take('jump')) {
+    if (!down(k.down) && !t.down && take('jump')) {
       if (ground) this.jump(false);
       else if (this.airJumps > 0) { this.airJumps--; this.jump(true); }
     }
-    if (!down(k.jump) && body.velocity.y < -120) body.setVelocityY(body.velocity.y * 0.85); // variable jump height
+    if (!down(k.jump) && !t.jumpHeld && body.velocity.y < -120) body.setVelocityY(body.velocity.y * 0.85); // variable jump height
 
     // animation
     if (!ground) this.play(body.velocity.y < 0 ? 'jump' : 'fall');

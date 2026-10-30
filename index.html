@@ -2,22 +2,27 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
   <title>AXENFALL</title>
   <style>
     @font-face { font-family: 'Galmuri11'; src: url('fonts/Galmuri11.woff2') format('woff2'); }
     @font-face { font-family: 'Galmuri11B'; src: url('fonts/Galmuri11-Bold.woff2') format('woff2'); }
     @font-face { font-family: 'Galmuri9'; src: url('fonts/Galmuri9.woff2') format('woff2'); }
     @font-face { font-family: 'Galmuri14'; src: url('fonts/Galmuri14.woff2') format('woff2'); }
-    html, body { margin: 0; height: 100%; background: #07060d; overflow: hidden; }
+    html, body { margin: 0; height: 100%; background: #07060d; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     #game { width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; }
     canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
+    #rotate { display: none; position: fixed; inset: 0; z-index: 10; background: #07060d; color: #ffd166; font: 16px Galmuri11, sans-serif; align-items: center; justify-content: center; text-align: center; line-height: 1.8; }
+    @media (orientation: portrait) and (pointer: coarse) { #rotate { display: flex; } }
     .fontload { position: absolute; left: -999px; font-size: 12px; }
   </style>
 </head>
 <body>
   <div class="fontload"><span style="font-family:Galmuri11">가</span><span style="font-family:Galmuri11B">가</span><span style="font-family:Galmuri9">가</span><span style="font-family:Galmuri14">가</span></div>
   <div id="game"></div>
+  <div id="rotate">📱 화면을 가로로 돌려 주세요<br><span style="color:#9a8fbf;font-size:13px">AXENFALL은 가로 화면에서 플레이해요</span></div>
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

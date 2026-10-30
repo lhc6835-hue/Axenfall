@@ -131,7 +131,8 @@ export class BattleScene extends Phaser.Scene {
     codeToAction.set(K.W, 'jump');
     // basic attack = left mouse button (holding it keeps the combo going)
     this.input.mouse?.disableContextMenu();
-    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => { if (p.leftButtonDown()) this.buf.set('attack', this.time.now); });
+    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => { if (!p.wasTouch && p.leftButtonDown()) this.buf.set('attack', this.time.now); });
+    this.touch = { dx: 0, down: false, jumpHeld: false, attackHeld: false };
     this.buf.clear();
     kb.on('keydown', (e: KeyboardEvent) => { if (e.repeat) return; const a = codeToAction.get(e.keyCode); if (a) this.buf.set(a, this.time.now); });
     kb.on('keydown-ESC', () => this.pauseGame());
@@ -159,7 +160,11 @@ export class BattleScene extends Phaser.Scene {
   /** Consumes a buffered press. */
   take(a: keyof Keys) { const ok = this.peek(a); this.buf.delete(a); return ok; }
   /** Left mouse button currently held. */
-  get attackHeld() { const p = this.input.activePointer; return p.isDown && p.leftButtonDown(); }
+  get attackHeld() { const p = this.input.activePointer; return (p.isDown && !p.wasTouch && p.leftButtonDown()) || this.touch.attackHeld; }
+  /** On-screen controls state (written by the HUD on touch devices). */
+  touch = { dx: 0, down: false, jumpHeld: false, attackHeld: false };
+  /** Presses an action as if its key had just been pressed. */
+  press(a: keyof Keys) { this.buf.set(a, this.time.now); }
 
   hitstop(ms: number) { if (ms > 0) this.stopUntil = Math.max(this.stopUntil, this.time.now + ms); }
 
@@ -422,7 +427,7 @@ export class BattleScene extends Phaser.Scene {
     }
     if (this.phase !== 'clear' && this.phase !== 'dead') this.elapsed += dt;
     if (this.dropT > 0) this.dropT -= dt;
-    if (this.keys.down.some((k) => k.isDown) && this.peek('jump') && this.player.onGround && this.player.spr.y < GROUND_Y - 4) {
+    if ((this.keys.down.some((k) => k.isDown) || this.touch.down) && this.peek('jump') && this.player.onGround && this.player.spr.y < GROUND_Y - 4) {
       this.take('jump'); this.dropT = 260; this.player.body.setVelocityY(60);
     }
     if (this.phase !== 'clear') this.player.update(dt, this.keys);
