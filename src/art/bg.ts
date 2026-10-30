@@ -12,11 +12,14 @@ export interface Theme {
   leaf: number;
   ground: number;
   grass: number;
+  style?: 'forest' | 'waste';
+  lava?: number;
 }
 
 export const THEMES: Record<string, Theme> = {
   forest: { key: 'forest', sky: [0x2a1f5a, 0x4f7ab8, 0xffc89a], sun: 0xfff0b0, far: 0x6a7ac0, mid: 0x2f6a5a, near: 0x1e3f34, leaf: 0x4f9a3a, ground: 0x6a4a34, grass: 0x6cc24a },
   dusk: { key: 'dusk', sky: [0x1a0f3a, 0x7a3a7a, 0xff8a5a], sun: 0xffd08a, far: 0x5a3a7a, mid: 0x3a2a5a, near: 0x221a3a, leaf: 0x7a4ab0, ground: 0x4a3450, grass: 0xa070e0 },
+  ember: { key: 'ember', sky: [0x1a0610, 0x6a1a24, 0xff7a3a], sun: 0xffb060, far: 0x6a2a34, mid: 0x3a1a24, near: 0x1a0a12, leaf: 0x8a3a20, ground: 0x3a2428, grass: 0x6a5a58, style: 'waste', lava: 0xff6a1a },
   night: { key: 'night', sky: [0x07060d, 0x1a1440, 0x3a2a6a], sun: 0xd8e8ff, far: 0x2a2a5a, mid: 0x1a1a3a, near: 0x0f0f22, leaf: 0x2a3a6a, ground: 0x2a2440, grass: 0x4a5aa0 },
 };
 
@@ -86,8 +89,9 @@ export function buildBackground(scene: Phaser.Scene, th: Theme) {
     }
     addTex(scene, `bg_far_${k}`, cv);
   }
+  if (th.style === 'waste') buildWasteLayers(scene, th);
   // mid tree line (tileable canopy)
-  {
+  else {
     const h = 210;
     const [cv, ctx] = makeCanvas(W, h);
     const r = rng(31);
@@ -108,7 +112,7 @@ export function buildBackground(scene: Phaser.Scene, th: Theme) {
     addTex(scene, `bg_mid_${k}`, cv);
   }
   // near layer: big trunks and hanging leaves (tileable)
-  {
+  if (th.style !== 'waste') {
     const h = 300;
     const [cv, ctx] = makeCanvas(W, h);
     const r = rng(57);
@@ -145,6 +149,17 @@ export function buildBackground(scene: Phaser.Scene, th: Theme) {
     }
     addTex(scene, `ground_${k}`, cv);
   }
+  if (th.lava) {
+    // lava cracks in the ground tile
+    const tex = scene.textures.get(`ground_${k}`).getSourceImage() as HTMLCanvasElement;
+    const g = tex.getContext('2d')!;
+    const r = rng(101);
+    for (let i = 0; i < 5; i++) {
+      let x = Math.floor(r() * 60), y = 14 + Math.floor(r() * 30);
+      for (let s2 = 0; s2 < 10; s2++) { px(g, x, y, s2 % 3 ? th.lava : 0xffd04a); x = (x + (r() < 0.5 ? 1 : 0) + 64) % 64; y += r() < 0.5 ? 1 : 0; }
+    }
+    (scene.textures.get(`ground_${k}`) as Phaser.Textures.CanvasTexture).refresh();
+  }
   // floating platform tile 32x14
   {
     const [cv, ctx] = makeCanvas(32, 14);
@@ -171,3 +186,57 @@ export function buildBackground(scene: Phaser.Scene, th: Theme) {
 
 /** Utility: average color of a theme, used for UI tints. */
 export function themeTint(th: Theme) { return rgbToHex(hexToRgb(mix(th.mid, th.sky[1], 0.5))); }
+
+/** Volcanic wasteland: mesas and rock spires in the mid layer, cracked basalt pillars up close. */
+function buildWasteLayers(scene: Phaser.Scene, th: Theme) {
+  const k = th.key;
+  {
+    const h = 210;
+    const [cv, ctx] = makeCanvas(W, h);
+    const r = rng(41);
+    const shapes: Shape[] = [];
+    for (let i = 0; i < 8; i++) {
+      const x = (i / 8) * W + r() * 30, w = 50 + r() * 50, top = 80 + r() * 50;
+      for (const dx of [-W, 0, W]) {
+        shapes.push({ k: 'rect', x: x + dx, y: top, w, h: h - top, c: th.mid, r: 3, z: 1 });
+        shapes.push({ k: 'rect', x: x + dx - 4, y: top - 4, w: w + 8, h: 10, c: mix(th.mid, th.far, 0.4), r: 2, z: 2 });
+      }
+    }
+    for (let i = 0; i < 14; i++) {
+      const x = (i / 14) * W + r() * 20, w = 8 + r() * 12, top = 60 + r() * 70;
+      for (const dx of [-W, 0, W]) shapes.push({ k: 'tri', pts: [x + dx - w, 180, x + dx, top, x + dx + w, 180], c: mix(th.mid, th.near, 0.3), z: 3 });
+    }
+    shapes.push({ k: 'rect', x: 0, y: 166, w: W, h: 44, c: mix(th.mid, 0x0b0408, 0.45), z: 4, flat: true });
+    paintShapes(ctx, 0, 0, W, h, shapes, { outline: null, selout: true, light: [-0.4, -0.8, 0.45] });
+    // glowing lava river along the base
+    for (let x = 0; x < W; x++) {
+      const y = 170 + Math.round(Math.sin((x / W) * Math.PI * 6) * 2);
+      px(ctx, x, y, th.lava ?? 0xff6a1a); px(ctx, x, y + 1, mix(th.lava ?? 0xff6a1a, 0x000000, 0.4));
+    }
+    addTex(scene, `bg_mid_${k}`, cv);
+  }
+  {
+    const h = 300;
+    const [cv, ctx] = makeCanvas(W, h);
+    const r = rng(67);
+    const shapes: Shape[] = [];
+    const pillars: { x: number; w: number }[] = [];
+    for (let i = 0; i < 4; i++) {
+      const x = (i / 4) * W + r() * 80, w = 20 + r() * 16;
+      pillars.push({ x, w });
+      for (const dx of [-W, 0, W]) {
+        shapes.push({ k: 'rect', x: x + dx, y: 30, w, h: h - 30, c: th.near, r: 2, z: 1 });
+        shapes.push({ k: 'tri', pts: [x + dx - 6, 34, x + dx + w / 2, 0, x + dx + w + 6, 34], c: th.near, z: 1 });
+      }
+      // hanging crag from the top
+      const cx = x + W / 8;
+      for (const dx of [-W, 0, W]) shapes.push({ k: 'tri', pts: [cx + dx - 30, 0, cx + dx, 40 + r() * 30, cx + dx + 30, 0], c: mix(th.near, th.mid, 0.3), z: 2 });
+    }
+    paintShapes(ctx, 0, 0, W, h, shapes, { outline: null, light: [-0.6, -0.5, 0.6] });
+    for (const p of pillars) for (const dx of [-W, 0, W]) {
+      let x = p.x + dx + p.w / 2, y = 60 + r() * 40;
+      for (let s2 = 0; s2 < 60; s2++) { if (x >= 0 && x < W) px(ctx, x, y, s2 % 4 ? (th.lava ?? 0xff6a1a) : 0xffd04a); y += 2; x += r() < 0.5 ? -1 : 1; }
+    }
+    addTex(scene, `bg_near_${k}`, cv);
+  }
+}

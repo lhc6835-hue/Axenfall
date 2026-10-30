@@ -1,4 +1,4 @@
-import { W, H, UI, GRADE_INFO, FONT_B, FONT_L } from '../core/const';
+import { W, H, UI, GRADE_INFO, GRADES, FONT_B, FONT_L } from '../core/const';
 import { sfx } from '../core/audio';
 import { Save } from '../core/save';
 import { Button, CurrencyBar, fadeIn, go, gradeBadge, menuBackdrop, outlined, panel, text, toast } from '../core/ui';
@@ -15,6 +15,8 @@ export class CharacterScene extends Phaser.Scene {
   tabBtns: Button[] = [];
   tmpButtons: Button[] = [];
   slotSel = 0;
+  abPage = 0;
+  skPage = 0;
   back = 'Hub';
 
   constructor() { super('Character'); }
@@ -93,8 +95,12 @@ export class CharacterScene extends Phaser.Scene {
   // ------------------------------------------------------------------ abilities tab
   drawAbilities() {
     const c = this.content;
-    const cw = 96, ch = 116;
-    ABILITIES.forEach((a, i) => {
+    const cw = 96, ch = 116, per = 8;
+    const order = [...ABILITIES].sort((a, b) => GRADES.indexOf(a.grade) - GRADES.indexOf(b.grade));
+    const pages = Math.ceil(order.length / per);
+    this.abPage = Math.min(this.abPage, pages - 1);
+    this.pager(this.abPage, pages, (p) => { this.abPage = p; this.refresh(); });
+    order.slice(this.abPage * per, this.abPage * per + per).forEach((a, i) => {
       const x = 270 + (i % 4) * (cw + 4), y = 150 + Math.floor(i / 4) * (ch + 6);
       const owned = Save.owns(a.id);
       const card = this.abilityCard(a, x, y, cw, ch, owned);
@@ -104,6 +110,15 @@ export class CharacterScene extends Phaser.Scene {
       card.on('pointerout', () => this.tweens.add({ targets: card, scale: 1, duration: 90 }));
       card.on('pointerdown', () => { sfx(this, 'click'); this.detail(a); });
     });
+  }
+
+  /** ◀ 1/3 ▶ page switcher in the top-right of the content panel. */
+  pager(page: number, pages: number, go: (p: number) => void) {
+    if (pages <= 1) return;
+    const y = 62, x = 584;
+    this.content.add(text(this, x, y - 6, `${page + 1} / ${pages}`, 'S', UI.text).setOrigin(0.5, 0));
+    this.btn(x - 34, y, '◀', () => go((page + pages - 1) % pages), { w: 26, h: 22, size: 'S' });
+    this.btn(x + 34, y, '▶', () => go((page + 1) % pages), { w: 26, h: 22, size: 'S' });
   }
 
   abilityCard(a: AbilityDef, x: number, y: number, cw: number, ch: number, owned: boolean) {
@@ -239,7 +254,10 @@ export class CharacterScene extends Phaser.Scene {
       info.add(text(this, 222 + 4 + s.name.length * 12 + 6, 288, `${a.name} · ${s.kind === 'ult' ? '궁극기' : `쿨타임 ${s.cd}초`} · 위력 x${s.power}`, 'S', UI.dim));
       info.add(text(this, 222, 304, s.desc, 'S', UI.text).setWordWrapWidth(400));
     };
-    pool.forEach((s, i) => {
+    const per = 18, pages = Math.max(1, Math.ceil(pool.length / per));
+    this.skPage = Math.min(this.skPage, pages - 1);
+    this.pager(this.skPage, pages, (p) => { this.skPage = p; this.refresh(); });
+    pool.slice(this.skPage * per, this.skPage * per + per).forEach((s, i) => {
       const x = 236 + (i % 9) * 44, y = 204 + Math.floor(i / 9) * 44;
       const a = abilityById(s.ability);
       const used = ids.includes(s.id);
