@@ -93,7 +93,7 @@ export class HudScene extends Phaser.Scene {
 
   controlsHint() {
     const lines = ['← → 이동   C/Space 점프 (2단)   X 공격   Z/Shift 대시', 'A S D 스킬   F 궁극기 (게이지 100%)   ↓+점프 발판 내려가기   ESC 일시정지'];
-    const c = this.add.container(W / 2, H - 78);
+    const c = this.add.container(W / 2, 92);
     const bg = this.add.nineslice(0, 0, 'ui_panel', undefined, 470, 40, 8, 8, 8, 8).setAlpha(0.9);
     c.add(bg);
     lines.forEach((l, i) => c.add(text(this, 0, -9 + i * 14, l, 'S', i ? UI.dim : UI.text).setOrigin(0.5)));
