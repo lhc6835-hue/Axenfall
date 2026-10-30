@@ -1,6 +1,6 @@
 // The hero: a wide rectangle with two eyes and two short legs. Nothing else.
 import { ABILITIES } from '../data/abilities';
-import { addTex, makeCanvas, mix, px, ramp } from './pixel';
+import { addTex, makeCanvas, px } from './pixel';
 
 export const HERO_FW = 32;
 export const HERO_FH = 26;
@@ -34,65 +34,38 @@ const POSES: Record<string, HeroPose[]> = {
 
 export const HERO_ANIMS: Record<string, { frames: number[]; rate: number; repeat: number }> = {};
 
-/** Draws one hero frame at (ox, oy) inside a HERO_FW x HERO_FH cell. */
+/** Draws one hero frame at (ox, oy): one flat-coloured wide rectangle, two square eyes, two short legs. */
 export function drawHero(ctx: CanvasRenderingContext2D, ox: number, oy: number, body: number, pose: HeroPose, scale = 1) {
-  const r = ramp(body);
-  const ink = mix(r[0], 0x0b0714, 0.6);
-  const bw = Math.round((22 + pose.squash * 3) * scale);
-  const bh = Math.round((13 - pose.squash * 2) * scale);
-  const legH = Math.round(pose.legL[1] * scale), legH2 = Math.round(pose.legR[1] * scale);
-  const baseY = oy + HERO_FH * scale - 1;
-  const by = baseY - Math.max(legH, legH2) - bh + Math.round(pose.bodyDy * scale);
-  const bx = ox + Math.round((HERO_FW * scale - bw) / 2) + Math.round(pose.lean * scale * 0.5);
   const s = scale;
+  const [r, g, b] = [(body >> 16) & 255, (body >> 8) & 255, body & 255];
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  const eyeC = lum < 0.3 ? 0xffffff : 0x161216;
+  const bw = Math.round((22 + pose.squash * 3) * s);
+  const bh = Math.round((13 - pose.squash * 2) * s);
+  const legH = Math.max(1, Math.round(pose.legL[1] * s)), legH2 = Math.max(1, Math.round(pose.legR[1] * s));
+  const baseY = oy + HERO_FH * s;
+  const by = baseY - Math.max(legH, legH2) - bh + Math.round(pose.bodyDy * s);
+  const bx = ox + Math.round((HERO_FW * s - bw) / 2) + Math.round(pose.lean * s * 0.5);
   // legs
   const legW = Math.max(2, Math.round(3 * s));
-  const lx1 = bx + Math.round(5 * s) + Math.round(pose.legL[0] * s * 0.5);
-  const lx2 = bx + bw - Math.round(5 * s) - legW + Math.round(pose.legR[0] * s * 0.5);
-  const legTop = by + bh - 1;
-  for (const [lx, lh] of [[lx1, legH], [lx2, legH2]] as const) {
-    px(ctx, lx - 1, legTop, ink, legW + 2, lh + 2);
-    px(ctx, lx, legTop, r[1], legW, lh + 1);
-    px(ctx, lx, legTop, r[0], legW, Math.max(1, Math.round(s)));
-  }
-  // body outline (rounded corners)
-  const c = Math.max(1, Math.round(s));
-  px(ctx, bx + c, by - 1, ink, bw - 2 * c, 1);
-  px(ctx, bx + c, by + bh, ink, bw - 2 * c, 1);
-  px(ctx, bx - 1, by + c, ink, 1, bh - 2 * c);
-  px(ctx, bx + bw, by + c, ink, 1, bh - 2 * c);
-  for (let i = 0; i < c; i++) {
-    px(ctx, bx + i, by + c - 1 - i, ink); px(ctx, bx + bw - 1 - i, by + c - 1 - i, ink);
-    px(ctx, bx + i, by + bh - c + i, ink); px(ctx, bx + bw - 1 - i, by + bh - c + i, ink);
-  }
-  // body fill with soft vertical shading
-  for (let y = 0; y < bh; y++) {
-    const inset = y < c ? c - y : y >= bh - c ? y - (bh - c) + 1 : 0;
-    const t = y / (bh - 1);
-    const tone = t < 0.12 ? r[4] : t < 0.3 ? r[3] : t < 0.78 ? r[2] : r[1];
-    px(ctx, bx + inset, by + y, tone, bw - inset * 2, 1);
-  }
-  // side shading: right edge darker, left edge lit
-  px(ctx, bx + bw - Math.max(1, Math.round(1.5 * s)), by + c + 1, r[1], Math.max(1, Math.round(1.5 * s)), bh - 2 * c - 1);
-  px(ctx, bx, by + c, r[3], 1, bh - 2 * c - Math.round(3 * s));
-  // eyes
-  const ew = Math.max(2, Math.round(2.4 * s)), eh = Math.max(3, Math.round(5 * s));
+  const lx1 = bx + Math.round(4 * s) + Math.round(pose.legL[0] * s * 0.5);
+  const lx2 = bx + bw - Math.round(4 * s) - legW + Math.round(pose.legR[0] * s * 0.5);
+  px(ctx, lx1, by + bh, body, legW, baseY - by - bh - (Math.max(legH, legH2) - legH));
+  px(ctx, lx2, by + bh, body, legW, baseY - by - bh - (Math.max(legH, legH2) - legH2));
+  // body
+  px(ctx, bx, by, body, bw, bh);
+  // eyes (looking the way the hero faces)
+  const ew = Math.max(2, Math.round(2 * s)), eh = Math.max(2, Math.round(3 * s));
   const ey = by + Math.round(3 * s);
-  const ex1 = bx + Math.round(bw * 0.56) + Math.round(pose.lean * s * 0.4);
+  const ex1 = bx + Math.round(bw * 0.55) + Math.round(pose.lean * s * 0.4);
   const ex2 = ex1 + Math.round(6 * s);
+  const one = Math.max(1, Math.round(s));
   for (const ex of [ex1, ex2]) {
-    if (pose.eyes === 'blink') px(ctx, ex, ey + Math.floor(eh / 2), ink, ew, Math.max(1, Math.round(s)));
-    else if (pose.eyes === 'shut') {
-      px(ctx, ex, ey + 1, ink, ew, Math.max(1, Math.round(s)));
-      px(ctx, ex + ew - 1, ey + 1 + Math.round(s), ink, 1, Math.max(1, Math.round(s)));
-      px(ctx, ex, ey + 1 + Math.round(2 * s), ink, ew, Math.max(1, Math.round(s)));
-    } else {
-      const h = pose.eyes === 'wide' ? eh + Math.round(s) : pose.eyes === 'focus' ? eh - Math.round(s) : eh;
-      const yy = pose.eyes === 'focus' ? ey + Math.round(s) : ey;
-      px(ctx, ex, yy, ink, ew, h);
-      if (s >= 2) px(ctx, ex, yy, 0xffffff, Math.max(1, Math.round(s * 0.9)), Math.max(1, Math.round(s * 0.9)));
-      else px(ctx, ex, yy, mix(ink, 0xffffff, 0.75));
-    }
+    if (pose.eyes === 'blink') px(ctx, ex, ey + eh - one, eyeC, ew, one);
+    else if (pose.eyes === 'shut') px(ctx, ex - one, ey + one, eyeC, ew + one * 2, one);
+    else if (pose.eyes === 'wide') px(ctx, ex, ey - one, eyeC, ew, eh + one);
+    else if (pose.eyes === 'focus') px(ctx, ex, ey + one, eyeC, ew, eh - one);
+    else px(ctx, ex, ey, eyeC, ew, eh);
   }
 }
 

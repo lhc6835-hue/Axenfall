@@ -137,6 +137,7 @@ export interface PaintOpts {
   selout?: boolean; // darken edges between overlapping shapes
   dither?: boolean;
   steps?: number; // tones used from ramp (3 or 4)
+  flat?: boolean; // single flat colour per shape, no lighting
 }
 
 /** Paints lit shapes into ImageData at (ox,oy) on ctx. Shapes later in the array draw on top (or by z). */
@@ -159,7 +160,7 @@ export function paintShapes(ctx: CanvasRenderingContext2D, ox: number, oy: numbe
         if (!hit) continue;
         const rp = getRamp(s.c);
         let tone: number;
-        if ((s as { flat?: boolean }).flat) tone = 2;
+        if (opts.flat || (s as { flat?: boolean }).flat) tone = 2;
         else {
           let I = hit.nx * lx + hit.ny * ly + hit.nz * lz; // -1..1
           I = I * 0.5 + 0.5;
@@ -167,7 +168,7 @@ export function paintShapes(ctx: CanvasRenderingContext2D, ox: number, oy: numbe
           tone = Math.max(1, Math.min(4, Math.floor(t) + 1));
           if (tone === 4 && I < 0.9) tone = 3;
         }
-        col[y * w + x] = rp[tone];
+        col[y * w + x] = opts.flat ? s.c : rp[tone];
         owner[y * w + x] = sorted[k].i;
         break;
       }
