@@ -50,23 +50,32 @@ export function drawHero(ctx: CanvasRenderingContext2D, ox: number, oy: number, 
   const legW = Math.max(2, Math.round(3 * s));
   const lx1 = bx + Math.round(4 * s) + Math.round(pose.legL[0] * s * 0.5);
   const lx2 = bx + bw - Math.round(4 * s) - legW + Math.round(pose.legR[0] * s * 0.5);
-  px(ctx, lx1, by + bh, body, legW, baseY - by - bh - (Math.max(legH, legH2) - legH));
-  px(ctx, lx2, by + bh, body, legW, baseY - by - bh - (Math.max(legH, legH2) - legH2));
-  // body
-  px(ctx, bx, by, body, bw, bh);
-  // eyes (looking the way the hero faces)
-  const ew = Math.max(2, Math.round(2 * s)), eh = Math.max(2, Math.round(3 * s));
-  const ey = by + Math.round(3 * s);
-  const ex1 = bx + Math.round(bw * 0.55) + Math.round(pose.lean * s * 0.4);
-  const ex2 = ex1 + Math.round(6 * s);
-  const one = Math.max(1, Math.round(s));
-  for (const ex of [ex1, ex2]) {
-    if (pose.eyes === 'blink') px(ctx, ex, ey + eh - one, eyeC, ew, one);
-    else if (pose.eyes === 'shut') px(ctx, ex - one, ey + one, eyeC, ew + one * 2, one);
-    else if (pose.eyes === 'wide') px(ctx, ex, ey - one, eyeC, ew, eh + one);
-    else if (pose.eyes === 'focus') px(ctx, ex, ey + one, eyeC, ew, eh - one);
-    else px(ctx, ex, ey, eyeC, ew, eh);
+  px(ctx, lx1, by + bh - 1, body, legW, baseY - by - bh + 1 - (Math.max(legH, legH2) - legH));
+  px(ctx, lx2, by + bh - 1, body, legW, baseY - by - bh + 1 - (Math.max(legH, legH2) - legH2));
+  // body with softly rounded corners
+  const cr = Math.max(1, Math.round(1.5 * s));
+  for (let y = 0; y < bh; y++) {
+    const d = y < cr ? cr - y - 0.5 : y >= bh - cr ? y - (bh - cr) + 0.5 : 0;
+    const inset = d ? Math.round(cr - Math.sqrt(Math.max(0, cr * cr - d * d))) : 0;
+    px(ctx, bx + inset, by + y, body, bw - inset * 2, 1);
   }
+  // face: wide-set eyes, one long flat mouth, shifted a little toward the facing side
+  const cx = bx + bw * 0.56 + pose.lean * s * 0.4;
+  drawFace(ctx, cx, by + Math.round(3 * s), bw * 0.64, s, pose.eyes, eyeC);
+}
+
+/** Shared dopey face: two small eyes set far apart and a long straight mouth between/below them. */
+export function drawFace(ctx: CanvasRenderingContext2D, cx: number, eyeY: number, spread: number, s: number, eyes: HeroPose['eyes'] | 'open', c: number) {
+  const one = Math.max(1, Math.round(s));
+  const ew = Math.max(2, Math.round(2 * s)), eh = Math.max(2, Math.round(3 * s));
+  const xs = [Math.round(cx - spread / 2 - ew / 2), Math.round(cx + spread / 2 - ew / 2)];
+  for (const ex of xs) {
+    if (eyes === 'blink') px(ctx, ex, eyeY + eh - one, c, ew, one);
+    else if (eyes === 'shut') px(ctx, ex - one, eyeY + one, c, ew + one * 2, one);
+    else px(ctx, ex, eyeY, c, ew, eh);
+  }
+  const mw = Math.max(4, Math.round(spread * 0.62));
+  px(ctx, Math.round(cx - mw / 2), eyeY + eh + Math.max(2, Math.round(2 * s)), c, mw, one);
 }
 
 /** Builds a spritesheet for every ability body colour: key `hero_<abilityId>`. */
