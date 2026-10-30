@@ -1,5 +1,6 @@
 import { W, H, UI, FONT_L } from '../core/const';
 import { sfx } from '../core/audio';
+import { isFullscreen, toggleFullscreen } from '../core/fullscreen';
 import { Button, outlined, panel, text } from '../core/ui';
 import { STAGES, stageById } from '../data/stages';
 
@@ -80,12 +81,13 @@ export class PauseScene extends Phaser.Scene {
   constructor() { super('Pause'); }
   create(d: { stageId: string }) {
     this.add.rectangle(0, 0, W, H, 0x07060d, 0.7).setOrigin(0);
-    panel(this, W / 2 - 110, H / 2 - 80, 220, 160, 'ui_panelGold');
-    outlined(this, W / 2, H / 2 - 64, '일시 정지', 'L', UI.gold, true).setOrigin(0.5, 0);
+    panel(this, W / 2 - 110, H / 2 - 100, 220, 200, 'ui_panelGold');
+    outlined(this, W / 2, H / 2 - 86, '일시 정지', 'L', UI.gold, true).setOrigin(0.5, 0);
     const resume = () => { this.scene.stop(); this.scene.resume('Battle'); this.scene.resume('Hud'); };
-    new Button(this, W / 2, H / 2 - 18, '계속하기', resume, { w: 160 });
-    new Button(this, W / 2, H / 2 + 16, '다시 시작', () => { this.scene.stop('Hud'); this.scene.stop('Battle'); this.scene.start('Battle', { stageId: d.stageId }); }, { w: 160 });
-    new Button(this, W / 2, H / 2 + 50, '포기하고 나가기', () => { this.scene.stop('Hud'); this.scene.stop('Battle'); this.scene.start('StageSelect', { world: 1 }); }, { w: 160 });
+    new Button(this, W / 2, H / 2 - 40, '계속하기', resume, { w: 160 });
+    new Button(this, W / 2, H / 2 - 8, '다시 시작', () => { this.scene.stop('Hud'); this.scene.stop('Battle'); this.scene.start('Battle', { stageId: d.stageId }); }, { w: 160 });
+    new Button(this, W / 2, H / 2 + 24, isFullscreen() ? '전체화면 끄기' : '전체화면 켜기', () => { toggleFullscreen(); this.scene.restart(d); }, { w: 160 });
+    new Button(this, W / 2, H / 2 + 56, '포기하고 나가기', () => { this.scene.stop('Hud'); this.scene.stop('Battle'); this.scene.start('StageSelect', { world: 1 }); }, { w: 160 });
     this.input.keyboard!.once('keydown-ESC', resume);
   }
 }

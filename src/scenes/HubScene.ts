@@ -1,6 +1,7 @@
 import { W, H, UI, FONT_B, GRADE_INFO } from '../core/const';
 import { playBgm, sfx, setBgmVolume } from '../core/audio';
 import { Save } from '../core/save';
+import { isFullscreen, toggleFullscreen } from '../core/fullscreen';
 import { Button, CurrencyBar, fadeIn, go, menuBackdrop, outlined, panel, text, toast } from '../core/ui';
 import { abilityById } from '../data/abilities';
 import { STAGES } from '../data/stages';
@@ -90,14 +91,15 @@ export class HubScene extends Phaser.Scene {
     };
     row(H / 2 - 50, '효과음', () => Save.d.sfx, (v) => (Save.d.sfx = v));
     row(H / 2 - 20, '배경음', () => Save.d.bgm, (v) => { Save.d.bgm = v; setBgmVolume(v); });
-    c.add(text(this, W / 2, H / 2 + 6, this.cache.json.get('bgmManifest') && Object.keys(this.cache.json.get('bgmManifest')).length ? '' : '※ 배경음 파일이 아직 없습니다 (네트워크 허용 후 추가 예정)', 'S', UI.dim).setOrigin(0.5, 0));
+    c.add(text(this, W / 2, H / 2 - 2, this.cache.json.get('bgmManifest') && Object.keys(this.cache.json.get('bgmManifest')).length ? '' : '※ 배경음 파일이 아직 없습니다 (네트워크 허용 후 추가 예정)', 'S', UI.dim).setOrigin(0.5, 0));
+    close.push(new Button(this, W / 2, H / 2 + 26, isFullscreen() ? '전체화면 끄기' : '전체화면 켜기', () => { toggleFullscreen(); c.destroy(); close.forEach((b) => b.destroy()); }, { w: 150, h: 24 }));
     let armed = false;
-    const reset = new Button(this, W / 2 - 60, H / 2 + 50, '데이터 초기화', () => {
+    const reset = new Button(this, W / 2 - 60, H / 2 + 64, '데이터 초기화', () => {
       if (!armed) { armed = true; reset.setText('한 번 더 누르세요'); return; }
       Save.reset(); toast(this, '초기화되었습니다', UI.red); this.time.delayedCall(500, () => this.scene.restart());
     }, { w: 110 });
     close.push(reset);
-    close.push(new Button(this, W / 2 + 70, H / 2 + 50, '닫기', () => { c.destroy(); close.forEach((b) => b.destroy()); }, { w: 90, gold: true }));
+    close.push(new Button(this, W / 2 + 70, H / 2 + 64, '닫기', () => { c.destroy(); close.forEach((b) => b.destroy()); }, { w: 90, gold: true }));
     close.forEach((b) => b.setDepth(101));
   }
 }

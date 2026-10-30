@@ -10,6 +10,7 @@ import { GachaScene } from './scenes/GachaScene';
 import { BattleScene } from './scenes/BattleScene';
 import { HudScene } from './scenes/HudScene';
 import { ResultScene, PauseScene } from './scenes/ResultScene';
+import { setupFullscreen } from './core/fullscreen';
 
 (window as unknown as { Phaser: typeof Phaser }).Phaser = Phaser;
 
@@ -28,4 +29,5 @@ const game = new Phaser.Game({
   scene: [BootScene, TitleScene, HubScene, WorldScene, StageSelectScene, CharacterScene, GachaScene, BattleScene, HudScene, ResultScene, PauseScene],
 });
 
+setupFullscreen(game);
 (window as unknown as { game: Phaser.Game }).game = game;
