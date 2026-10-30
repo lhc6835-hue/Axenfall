@@ -45,7 +45,7 @@ export class Enemy implements Fighter {
     this.dmg = s.dmg * (stats ? 1 : lvD) * (elite ? 1.3 : 1);
     this.speed = s.speed * (elite ? 1.15 : 1);
     this.w = s.w; this.h = s.h;
-    this.shadow = bs.add.image(x, GROUND_Y + 1, 'shadowOval').setTint(0x000000).setAlpha(0.3).setDepth(18);
+    this.shadow = bs.add.image(x, GROUND_Y, 'shadowOval').setTint(0x000000).setAlpha(0.3).setDepth(21);
     this.spr = bs.physics.add.sprite(x, y, s.tex, 0).setOrigin(0.5, 1).setDepth(25);
     const body = this.spr.body as Phaser.Physics.Arcade.Body;
     body.setSize(s.w, s.h).setOffset((this.spr.width - s.w) / 2, this.spr.height - s.h);
@@ -80,7 +80,7 @@ export class Enemy implements Fighter {
 
   update(dt: number) {
     if (!this.alive) return;
-    this.shadow.setPosition(this.spr.x, GROUND_Y + 1);
+    this.shadow.setPosition(this.spr.x, GROUND_Y);
     this.aura?.setPosition(this.spr.x, this.spr.y - this.h * 0.6).setScale(0.9 + Math.sin(this.bs.time.now / 150) * 0.08);
     if (this.bar && this.barT > 0) { this.barT -= dt; this.drawBar(); if (this.barT <= 0) this.bar.clear(); }
     if (this.slowed > 0) { this.slowed -= dt; this.spr.anims.timeScale = 0.5; if (this.slowed <= 0) { this.spr.anims.timeScale = 1; if (this.frozen <= 0) this.spr.clearTint(); } else if (this.frozen <= 0) this.spr.setTint(0xa8d8ff); }
@@ -378,7 +378,7 @@ export class Beetle extends Enemy {
     // stun state for beetle means "exposed" — not the generic hurt stun
     if (this.st === 'stun' && this.alive && this.frozen <= 0) {
       this.t -= dt;
-      this.shadow.setPosition(this.spr.x, GROUND_Y + 1);
+      this.shadow.setPosition(this.spr.x, GROUND_Y);
       this.body.setVelocityX(this.body.velocity.x * 0.85);
       if (this.t <= 0) { this.st = 'move'; this.cd = 1500 + Math.random() * 800; }
       return;

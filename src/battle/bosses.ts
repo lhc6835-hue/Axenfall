@@ -286,8 +286,8 @@ export class Elderwood extends Boss {
     this.spr.play('tree_idle');
     this.body.setAllowGravity(false);
     this.body.setImmovable(true);
-    this.spr.y = GROUND_Y + 2;
-    this.body.reset(x, GROUND_Y + 2);
+    this.spr.y = GROUND_Y;
+    this.body.reset(x, GROUND_Y);
     this.shadow.setScale(5, 2);
     for (const side of [-1, 1]) {
       const a = bs.add.sprite(x + side * 58, GROUND_Y - 70, 'boss_arm', 0).setDepth(26).setFlipX(side > 0);

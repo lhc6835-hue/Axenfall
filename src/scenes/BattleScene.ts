@@ -79,7 +79,7 @@ export class BattleScene extends Phaser.Scene {
     }).setScrollFactor(0).setDepth(-7);
     lay(`bg_near_${k}`, -40, 300, 0.6, -6, 1);
     // ground
-    this.add.tileSprite(0, GROUND_Y - 6, L, 70, `ground_${k}`).setOrigin(0).setDepth(20);
+    this.add.tileSprite(0, GROUND_Y - 1, L, 70, `ground_${k}`).setOrigin(0).setDepth(20);
     this.ground = this.add.rectangle(L / 2, GROUND_Y + 30, L + 400, 60, 0x000000, 0);
     this.physics.add.existing(this.ground, true);
     this.platforms = this.physics.add.staticGroup();

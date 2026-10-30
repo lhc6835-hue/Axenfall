@@ -52,7 +52,7 @@ export class Player implements Fighter {
     this.hp = this.maxHp;
     this.slots = [...Save.d.slots];
     this.ultId = Save.d.ult;
-    this.shadow = bs.add.image(x, GROUND_Y + 1, 'shadowOval').setTint(0x000000).setAlpha(0.35).setDepth(19);
+    this.shadow = bs.add.image(x, GROUND_Y, 'shadowOval').setTint(0x000000).setAlpha(0.35).setDepth(21);
     this.spr = bs.physics.add.sprite(x, GROUND_Y - 2, 'hero_' + this.ability.id, 0);
     this.spr.setOrigin(0.5, 1).setDepth(30);
     const body = this.spr.body as Phaser.Physics.Arcade.Body;
@@ -99,7 +99,7 @@ export class Player implements Fighter {
     if (ground && !this.wasOnGround) this.onLand();
     this.wasOnGround = ground;
     if (ground) this.airJumps = 1;
-    this.shadow.setPosition(this.spr.x, GROUND_Y + 1);
+    this.shadow.setPosition(this.spr.x, GROUND_Y);
     const air = Math.max(0, GROUND_Y - this.spr.y);
     this.shadow.setScale(Math.max(0.3, 0.9 - air / 200), 1).setAlpha(Math.max(0.1, 0.35 - air / 500));
 
