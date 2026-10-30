@@ -5,6 +5,7 @@ import { abilityById, abilityPower, skillById, type AbilityDef } from '../data/a
 import type { BattleScene } from '../scenes/BattleScene';
 import type { Fighter, HitInfo } from './combat';
 import { BASICS, SKILL_FX, type SkillCtx } from './skills';
+import './skills2';
 
 export interface Keys {
   left: Phaser.Input.Keyboard.Key[]; right: Phaser.Input.Keyboard.Key[]; up: Phaser.Input.Keyboard.Key[]; down: Phaser.Input.Keyboard.Key[];
@@ -83,8 +84,26 @@ export class Player implements Fighter {
     return { bs: this.bs, p: this, dir: this.facing, atk: this.power(abilityId) * mult, fx: this.bs.fx, c1: a.fx, c2: a.fx2, ability: a };
   }
 
+  /** Recent (time, hp, x) samples for the rewind skill. */
+  hpLog: { t: number; hp: number; x: number }[] = [];
+  /** Active parry stance: hits during the window are cancelled and trigger the counter. */
+  parry: { until: number; fn: (h: HitInfo) => void } | null = null;
+
+  heal(v: number) {
+    if (this.state === 'dead') return;
+    const amt = Math.min(Math.round(v), this.maxHp - this.hp);
+    if (amt <= 0) return;
+    this.hp += amt;
+    this.bs.fx.number(this.spr.x, this.spr.y - 26, amt, false, 0x5dffa0);
+    this.bs.fx.burst(this.spr.x, this.y, { tex: 'p2', n: 6, color: [0x5dffa0, 0xffffff], speed: [20, 60], angle: [240, 300], life: [300, 500] });
+  }
+
   update(dt: number, k: Keys) {
     const now = this.bs.time.now;
+    if (!this.hpLog.length || now - this.hpLog[this.hpLog.length - 1].t > 100) {
+      this.hpLog.push({ t: now, hp: this.hp, x: this.spr.x });
+      if (this.hpLog.length > 40) this.hpLog.shift();
+    }
     if (this.iframes > 0) {
       this.iframes -= dt;
       this.spr.setAlpha(this.iframes > 0 && Math.floor(now / 60) % 2 ? 0.35 : 1);
@@ -282,6 +301,9 @@ export class Player implements Fighter {
   gainUlt(v: number) { this.ult = Math.min(100, this.ult + v); }
 
   takeHit(h: HitInfo) {
+    if (this.parry && this.bs.time.now < this.parry.until && this.state !== 'dead') {
+      const p = this.parry; this.parry = null; p.fn(h); return false;
+    }
     if (this.invulnerable() || this.state === 'dead') return false;
     this.hp -= h.dmg;
     this.damageTaken += h.dmg;
