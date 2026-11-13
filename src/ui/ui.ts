@@ -135,6 +135,59 @@ function bindVolume(m: HTMLElement) {
   });
 }
 
+// ---------------- title decoration ----------------
+/** crossed katana and revolver, drawn with the game's own pixel art, keyed to transparent */
+function paintEmblem(c: HTMLCanvasElement) {
+  const g = new Gfx(c.width, c.height);
+  g.vignette = 0;
+  g.buildVignette();
+  g.ox = 0;
+  g.oy = 0;
+  const KEY = 0x010203;
+  g.clear(KEY);
+  const cx = c.width / 2, cy = c.height / 2;
+  const kat = swordById('s_katana');
+  drawSword(new Xf(g, cx - 13, cy + 11, -0.62, 1), 'katana', kat.color, 0);
+  drawGun(new Xf(g, cx + 9, cy + 8, Math.PI + 0.62, -1), 'revolver', blankPose(), 0);
+  const ctx = c.getContext('2d')!;
+  g.present(ctx);
+  const img = ctx.getImageData(0, 0, c.width, c.height);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) if (d[i] === 1 && d[i + 1] === 2 && d[i + 2] === 3) d[i + 3] = 0;
+  ctx.putImageData(img, 0, 0);
+}
+
+function decorateLogo(w: HTMLElement) {
+  const em = w.querySelector<HTMLCanvasElement>('.logo-emblem');
+  if (em) paintEmblem(em);
+  // sparks thrown off the cut when PARRY is sliced
+  const burst = w.querySelector<HTMLElement>('.logo-burst');
+  if (burst)
+    for (let i = 0; i < 14; i++) {
+      const sp = document.createElement('i');
+      const a = -0.35 + (Math.random() - 0.5) * 2.6 + (i % 2 ? Math.PI : 0);
+      const r = 40 + Math.random() * 90;
+      sp.style.setProperty('--dx', `${Math.cos(a) * r}px`);
+      sp.style.setProperty('--dy', `${Math.sin(a) * r * 0.7}px`);
+      sp.style.animationDelay = `${0.38 + Math.random() * 0.06}s`;
+      sp.style.animationDuration = `${0.45 + Math.random() * 0.35}s`;
+      if (i % 3 === 0) sp.className = 'w';
+      burst.appendChild(sp);
+    }
+  // embers drifting up around the title
+  const embers = w.querySelector<HTMLElement>('.logo-embers');
+  if (embers)
+    for (let i = 0; i < 16; i++) {
+      const e = document.createElement('i');
+      e.style.left = `${4 + Math.random() * 92}%`;
+      e.style.animationDelay = `${-Math.random() * 7}s`;
+      e.style.animationDuration = `${5 + Math.random() * 4}s`;
+      e.style.setProperty('--sway', `${(Math.random() - 0.5) * 40}px`);
+      if (i % 3 === 0) e.className = 'v';
+      embers.appendChild(e);
+    }
+}
+
 // =====================================================================
 export class UI {
   shopTab: ShopCat = 'gun';
@@ -166,12 +219,17 @@ export class UI {
     w.innerHTML = `
       <div class="topbar">${this.goldChip()}</div>
       <div class="title logo">
+        <div class="logo-aura" aria-hidden="true"></div>
+        <canvas class="logo-emblem" width="84" height="44" aria-hidden="true"></canvas>
+        <div class="logo-embers" aria-hidden="true"></div>
         <h1 class="logo-parry" aria-label="PARRY CUBE">
           <span class="half top">PARRY</span><span class="half bot">PARRY</span>
           <svg class="cut" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
             <defs><linearGradient id="cutg" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".25" stop-color="#fff" stop-opacity=".9"/><stop offset=".75" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>
             <line x1="-6" y1="76" x2="106" y2="34" stroke="url(#cutg)" vector-effect="non-scaling-stroke" />
+            <line class="glint" x1="-6" y1="76" x2="106" y2="34" vector-effect="non-scaling-stroke" />
           </svg>
+          <span class="logo-burst" aria-hidden="true"></span>
         </h1>
         <div class="logo-cube" aria-hidden="true"><b>C</b><b>U</b><b>B</b><b>E</b></div>
         <p class="logo-sub"><i></i>패리 큐브 · 검 하나, 총 하나<i></i></p>
@@ -197,6 +255,7 @@ export class UI {
     w.querySelector<HTMLElement>('[data-a=loadout]')!.onclick = () => { sfx.ui(); this.loadout(); };
     w.querySelector<HTMLElement>('[data-a=opt]')!.onclick = () => { sfx.ui(); this.options(); };
     root().appendChild(w);
+    decorateLogo(w);
   }
 
   options() {

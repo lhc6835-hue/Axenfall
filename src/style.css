@@ -38,21 +38,34 @@ button { font-family: inherit; cursor: pointer; }
   color: #f2f0ff;
 }
 .logo-parry .half { display: block; }
+.logo-parry .half { position: relative; }
+.logo-parry .half.top, .logo-parry .half.bot {
+  color: transparent;
+  background-image:
+    linear-gradient(105deg, transparent 0 40%, rgba(255, 255, 255, .95) 47%, rgba(255, 250, 220, .9) 50%, transparent 57% 100%),
+    linear-gradient(180deg, #ffffff 0%, #f0ecff 34%, #b8acec 52%, #8a7ccc 60%, #e6e0ff 78%, #ffffff 100%);
+  background-size: 260% 100%, 100% 100%;
+  background-position: 160% 0, 0 0;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text; background-clip: text;
+  animation: shine 4.5s 1.4s ease-in-out infinite;
+}
 .logo-parry .half.top {
   clip-path: polygon(0 0, 100% 0, 100% 39%, 0 74%);
-  text-shadow: .06em .06em 0 #3a2d78, 0 0 .3em rgba(122, 96, 255, .18);
+  filter: drop-shadow(.06em .06em 0 #3a2d78) drop-shadow(0 0 .22em rgba(140, 110, 255, .35));
 }
+@keyframes shine { 0% { background-position: 160% 0, 0 0; } 45%, 100% { background-position: -60% 0, 0 0; } }
 /* the lower half has been cut off and slid along the blade */
 .logo-parry .half.bot {
-  position: absolute; inset: 0; color: #d6d0f2;
+  position: absolute; inset: 0;
   clip-path: polygon(0 74%, 100% 39%, 100% 100%, 0 100%);
-  text-shadow: .06em .06em 0 #2a2060;
+  filter: drop-shadow(.06em .06em 0 #2a2060) drop-shadow(0 0 .22em rgba(140, 110, 255, .3)) brightness(.9);
   transform: translate(.11em, .02em);
-  animation: slice-off .55s .35s cubic-bezier(.2, 1.4, .4, 1) both;
+  animation: slice-off .55s .35s cubic-bezier(.2, 1.4, .4, 1) both, shine 4.5s 1.4s ease-in-out infinite;
 }
 .logo-parry .cut { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 .logo-parry .cut line {
-  stroke-width: 2px; stroke-dasharray: 130; stroke-dashoffset: 130;
+  stroke-width: 2px; stroke-dasharray: 1600; stroke-dashoffset: 1600;
   animation: cut-draw .3s .15s cubic-bezier(.6, 0, .2, 1) forwards, cut-fade 1.6s .45s ease-out forwards;
 }
 @keyframes cut-draw { to { stroke-dashoffset: 0; } }
@@ -233,3 +246,63 @@ button { font-family: inherit; cursor: pointer; }
 .vol span { min-width: 72px; text-align: left; color: var(--dim); }
 .vol input { flex: 1; accent-color: #ffd23a; }
 .vol b { min-width: 28px; text-align: right; font-weight: normal; color: #ffe08a; }
+
+/* ---------- title dressing ---------- */
+.logo { position: relative; }
+.logo-aura {
+  position: absolute; left: 50%; top: 38%; width: 150%; height: 170%; transform: translate(-50%, -50%);
+  background: radial-gradient(ellipse at 50% 45%, rgba(122, 90, 255, .32), rgba(122, 90, 255, .08) 38%, transparent 62%),
+              radial-gradient(ellipse at 50% 78%, rgba(255, 196, 60, .16), transparent 45%);
+  pointer-events: none; animation: aura 5s ease-in-out infinite; z-index: -1;
+}
+@keyframes aura { 50% { opacity: .65; transform: translate(-50%, -50%) scale(1.04); } }
+.logo-emblem {
+  position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%) scale(1); width: min(520px, 92vw); height: auto;
+  image-rendering: pixelated; opacity: 0; pointer-events: none; z-index: -1;
+  filter: drop-shadow(0 0 6px rgba(160, 140, 255, .45));
+  animation: emblem-in 1s .9s ease-out forwards;
+}
+@keyframes emblem-in { to { opacity: .3; } }
+.logo-embers { position: absolute; inset: -20% -15% -10%; pointer-events: none; overflow: hidden; z-index: -1; }
+.logo-embers i {
+  position: absolute; bottom: 0; width: 3px; height: 3px; background: #ffd23a; box-shadow: 0 0 6px 1px #ffb32e;
+  opacity: 0; animation: ember linear infinite;
+}
+.logo-embers i.v { background: #b8a6ff; box-shadow: 0 0 6px 1px #8a6bff; width: 2px; height: 2px; }
+@keyframes ember {
+  0% { transform: translate(0, 0); opacity: 0; }
+  15% { opacity: .9; }
+  100% { transform: translate(var(--sway), -260px); opacity: 0; }
+}
+.logo-burst { position: absolute; left: 50%; top: 56%; width: 0; height: 0; pointer-events: none; }
+.logo-burst i {
+  position: absolute; width: 4px; height: 2px; background: #ffe08a; box-shadow: 0 0 6px #ffb32e; opacity: 0;
+  animation: burst ease-out both;
+}
+.logo-burst i.w { background: #fff; box-shadow: 0 0 8px #fff; }
+@keyframes burst {
+  0% { transform: translate(0, 0) scaleX(2.5); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scaleX(.5); opacity: 0; }
+}
+.logo-parry .cut .glint {
+  stroke: #fff; stroke-width: 3px; stroke-linecap: round; stroke-dasharray: 22 3000; stroke-dashoffset: 30; opacity: .9;
+  filter: drop-shadow(0 0 4px #fff);
+  animation: glint 3.6s 1.6s ease-in-out infinite;
+}
+@keyframes glint { 0% { stroke-dashoffset: 30; } 40%, 100% { stroke-dashoffset: -1200; } }
+.logo-cube b { position: relative; }
+.logo-cube b::after {
+  content: ''; position: absolute; inset: -.09em; border: .09em solid #fff3b0; opacity: 0;
+  box-shadow: 0 0 .35em #ffd23a, inset 0 0 .3em rgba(255, 210, 58, .5);
+  animation: tile-glow 4s infinite;
+}
+.logo-cube b:nth-child(1)::after { animation-delay: 1.4s; }
+.logo-cube b:nth-child(2)::after { animation-delay: 1.6s; }
+.logo-cube b:nth-child(3)::after { animation-delay: 1.8s; }
+.logo-cube b:nth-child(4)::after { animation-delay: 2s; }
+@keyframes tile-glow { 0%, 100% { opacity: 0; } 8% { opacity: 1; } 22% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .logo-aura, .logo-embers, .logo-burst, .logo-parry .cut .glint, .logo-cube b::after { display: none; }
+  .logo-parry .half.top, .logo-parry .half.bot { animation: none; }
+  .logo-emblem { animation: none; opacity: .2; }
+}
