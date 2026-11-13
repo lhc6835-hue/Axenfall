@@ -231,7 +231,7 @@ export class UI {
           </svg>
           <span class="logo-burst" aria-hidden="true"></span>
         </h1>
-        <div class="logo-cube" aria-hidden="true"><b>C</b><b>U</b><b>B</b><b>E</b></div>
+        <div class="logo-cube" aria-hidden="true"><b>C</b><b>U</b><b>B</b><b>E</b><span class="cc"></span><span class="cc"></span><span class="cc"></span></div>
         <p class="logo-sub"><i></i>패리 큐브 · 검 하나, 총 하나<i></i></p>
       </div>
       <div class="eqline">
