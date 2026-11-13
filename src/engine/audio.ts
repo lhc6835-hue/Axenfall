@@ -12,6 +12,9 @@ const SFX = [
   'casing1', 'casing2', 'ui', 'ui_back', 'deny', 'buy', 'coin', 'levelup', 'heal', 'victory', 'defeat',
   'kill1', 'kill2', 'kill3', 'bhit1', 'bhit2', 'slam', 'slam2', 'eshot1', 'eshot2', 'rail', 'charge',
   'reflect', 'gem1', 'gem2', 'dash', 'click', 'boss', 'start',
+  'shot_derringer', 'shot_lever', 'shot_rifle', 'shot_dbarrel', 'shot_cannon', 'shot_musket', 'shot_laser', 'shot_laser2',
+  'explode', 'explode2', 'vent', 'cool', 'ignite', 'lever', 'gate', 'ar_out', 'ar_in', 'ar_bolt', 'breech',
+  'break_open', 'break_shut', 'shell_breech', 'hammer', 'flint',
 ] as const;
 export type SfxName = (typeof SFX)[number];
 export type Track = 'lobby' | 'battle' | 'boss1' | 'boss2';
@@ -185,6 +188,20 @@ class Sfx {
         this.play('rail', { vol: 1 });
         this.play('slam', { vol: 0.45, rate: 1.4 });
         return;
+      case 'derringer': return this.play('shot_derringer', { vol: 0.7, gate: 30 });
+      case 'lever': return this.play('shot_lever', { vol: 0.85, gate: 30 });
+      case 'rifle': return this.play('shot_rifle', { vol: 0.6, gate: 40, jitter: 0.06, max: 4 });
+      case 'laser': return this.play(['shot_laser', 'shot_laser2'], { vol: 0.45, gate: 50, jitter: 0.08, max: 4 });
+      case 'dbarrel': return this.play('shot_dbarrel', { vol: 1, gate: 40 });
+      case 'cannon':
+        this.play('shot_cannon', { vol: 1, rate: 0.82, gate: 40, jitter: 0.02 });
+        this.play('slam2', { vol: 0.35, rate: 0.8 });
+        return;
+      case 'musket':
+        this.play('shot_musket', { vol: 1, rate: 0.9, gate: 40 });
+        this.play('slam', { vol: 0.4, rate: 1.2 });
+        return;
+      case 'launcher': return this.play('slam2', { vol: 0.8, rate: 0.7, gate: 40 });
     }
   }
   charge() {
@@ -206,7 +223,32 @@ class Sfx {
   spin() {
     this.play(['swing_s1', 'swing_s2', 'swing_s3'], { vol: 0.35, rate: 1.5, gate: 60 });
   }
+  explode() {
+    this.play(['explode', 'explode2'], { vol: 0.95, gate: 50, max: 3 });
+    this.play('slam', { vol: 0.5, gate: 50, max: 2 });
+    this.duckMusic(0.3, 0.15);
+  }
   swing(kind: string) {
+    switch (kind) {
+      case 'saber': return this.play(['swing_s1', 'swing_s2', 'swing_s3'], { vol: 0.8, rate: 1.05 });
+      case 'cleaver': return this.play(['swing_m1', 'swing_m2', 'swing_m3'], { vol: 0.9, rate: 0.75 });
+      case 'katar': return this.play(['swing_s1', 'swing_s2', 'swing_s3'], { vol: 0.7, rate: 1.45, gate: 30 });
+      case 'spear': return this.play(['swing_m1', 'swing_m2', 'swing_m3'], { vol: 0.9, rate: 1.25 });
+      case 'nodachi':
+        this.play(['swing_h1', 'swing_h2'], { vol: 0.9, rate: 1.05 });
+        this.play('blade', { vol: 0.3, rate: 1.05 });
+        return;
+      case 'twinblade': return this.play(['swing_m1', 'swing_m2', 'swing_m3'], { vol: 0.75, rate: 1.35, gate: 40 });
+      case 'whip':
+        this.play(['swing_h1', 'swing_h2'], { vol: 0.85, rate: 1.35 });
+        this.play('click', { vol: 0.5, rate: 0.9, delay: 0.04 });
+        this.play('click', { vol: 0.4, rate: 1.1, delay: 0.09 });
+        return;
+      case 'plasma':
+        this.play(['swing_m1', 'swing_m2', 'swing_m3'], { vol: 0.8, rate: 1.5 });
+        this.play('ignite', { vol: 0.35, rate: 1.6 });
+        return;
+    }
     if (kind === 'greatsword' || kind === 'scythe') this.play(['swing_h1', 'swing_h2'], { vol: 0.9, rate: kind === 'scythe' ? 1.15 : 0.9 });
     else if (kind === 'longsword' || kind === 'katana') this.play(['swing_m1', 'swing_m2', 'swing_m3'], { vol: 0.85, rate: kind === 'katana' ? 1.15 : 1 });
     else this.play(['swing_s1', 'swing_s2', 'swing_s3'], { vol: 0.8, rate: kind === 'rapier' ? 1.3 : 1.15 });

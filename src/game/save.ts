@@ -22,7 +22,7 @@ export interface Save {
 }
 
 const KEY = 'parrycube_save_v1';
-export const SLOTS_PER_CAT = 4;
+export const SLOTS_PER_CAT = 6;
 export const RESTOCK_MS = 15 * 60 * 1000;
 
 function fresh(): Save {

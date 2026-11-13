@@ -54,7 +54,12 @@ function paintPreview(canvas: HTMLCanvasElement, item: Item, time: number) {
   } else if (item.cat === 'sword') {
     const def = swordById(item.id);
     const L = BLADE_LEN[def.kind];
-    const x = new Xf(g, PV_W / 2 - L / 2 + 1, PV_H / 2, def.kind === 'scythe' ? 0.35 : -0.25, 1);
+    // long polearms sit diagonally so the whole weapon fits the card
+    const k = def.kind;
+    const diag = k === 'spear' || k === 'twinblade' || k === 'nodachi';
+    const ang = k === 'scythe' ? 0.35 : diag ? -0.4 : -0.25;
+    const cx = k === 'spear' ? PV_W / 2 - 5 : k === 'twinblade' ? PV_W / 2 : k === 'nodachi' ? PV_W / 2 - 9 : PV_W / 2 - L / 2 + 1;
+    const x = new Xf(g, cx, PV_H / 2 + (diag ? 1 : 0), ang, 1);
     drawSword(x, def.kind, def.color, time, false);
   } else {
     const def = skinById(item.id);

@@ -10,7 +10,9 @@ export const RARITY: Record<Rarity, { name: string; color: string; weight: numbe
 export const RARITY_ORDER: Rarity[] = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
 
 // ---------------- guns ----------------
-export type GunKind = 'pistol' | 'revolver' | 'smg' | 'shotgun' | 'sniper' | 'minigun' | 'railgun';
+export type GunKind =
+  | 'pistol' | 'revolver' | 'smg' | 'shotgun' | 'sniper' | 'minigun' | 'railgun'
+  | 'derringer' | 'lever' | 'rifle' | 'laser' | 'dbarrel' | 'cannon' | 'musket' | 'launcher';
 
 export interface GunDef {
   id: string;
@@ -36,6 +38,12 @@ export interface GunDef {
   shake: number;
   tracer: number;
   starter?: boolean;
+  /** rounds per trigger pull */
+  burst?: number;
+  /** explosion radius at the impact point */
+  splash?: number;
+  /** no magazine: overheats and vents instead */
+  heat?: boolean;
 }
 
 export const GUNS: GunDef[] = [
@@ -74,10 +82,52 @@ export const GUNS: GunDef[] = [
     desc: '충전 후 모든 것을 관통하는 전자기 빔. 배터리를 뽑아 증기를 빼요.', hold: '두 손 · 충전 사격',
     dmg: 130, rate: 0.75, mag: 4, reload: 2.3, range: 420, spread: 0, pellets: 1, pierce: 999, crit: 0.2, knock: 220, stop: 0.08, shake: 7, tracer: 0x8ff3ff,
   },
+  {
+    id: 'g_derringer', kind: 'derringer', name: '포켓 데린저', rarity: 'common', price: 260,
+    desc: '손바닥만 한 2연발. 총신을 위로 꺾어 두 발을 엄지로 밀어 넣어요.', hold: '한 손 · 손바닥에 숨기기',
+    dmg: 15, rate: 3.6, mag: 2, reload: 0.7, range: 120, spread: 0.06, pellets: 1, pierce: 0, crit: 0.28, knock: 50, stop: 0.02, shake: 1.4, tracer: 0xffe0b0,
+  },
+  {
+    id: 'g_lever', kind: 'lever', name: '레버액션 카빈', rarity: 'uncommon', price: 1400,
+    desc: '쏠 때마다 총을 한 바퀴 돌려 레버를 당겨요. 장전은 옆구리 게이트로 한 발씩.', hold: '한 손 · 스핀콕',
+    dmg: 24, rate: 1.6, mag: 8, reload: 0.26, range: 220, spread: 0.02, pellets: 1, pierce: 1, crit: 0.15, knock: 90, stop: 0.03, shake: 2.4, tracer: 0xffd890,
+  },
+  {
+    id: 'g_rifle', kind: 'rifle', name: '3점사 소총', rarity: 'uncommon', price: 1650,
+    desc: '방아쇠 한 번에 세 발. 탄창을 갈고 바닥을 툭 쳐서 확인해요.', hold: '두 손 · 견착 점사',
+    dmg: 9.5, rate: 2.3, mag: 30, reload: 1.55, range: 210, spread: 0.05, pellets: 1, pierce: 0, crit: 0.08, knock: 35, stop: 0.012, shake: 1.2, tracer: 0xfff0b8, burst: 3,
+  },
+  {
+    id: 'g_dbarrel', kind: 'dbarrel', name: '소드오프 쌍발', rarity: 'rare', price: 3100,
+    desc: '짧게 자른 쌍발 산탄. 총신을 꺾어 탄피를 튕기고 손목으로 탁 닫아요.', hold: '한 손 · 중절식',
+    dmg: 8, rate: 2.2, mag: 2, reload: 0.95, range: 95, spread: 0.6, pellets: 8, pierce: 0, crit: 0.05, knock: 200, stop: 0.045, shake: 4.5, tracer: 0xffb860,
+  },
+  {
+    id: 'g_laser', kind: 'laser', name: '광자 블래스터', rarity: 'rare', price: 3700,
+    desc: '탄창 없음. 계속 쏘면 과열돼서 냉각판을 열고 증기를 뿜어요.', hold: '한 손 · 과열 냉각',
+    dmg: 9, rate: 7, mag: 24, reload: 1.3, range: 200, spread: 0.04, pellets: 1, pierce: 1, crit: 0.1, knock: 30, stop: 0.01, shake: 0.8, tracer: 0xff6ad8, heat: true,
+  },
+  {
+    id: 'g_cannon', kind: 'cannon', name: '핸드 캐논 .50', rarity: 'epic', price: 8200,
+    desc: '대구경 권총. 쏠 때마다 총구가 하늘로 튀어 올라요.', hold: '한 손 · 대구경',
+    dmg: 78, rate: 1.1, mag: 7, reload: 1.4, range: 240, spread: 0.01, pellets: 1, pierce: 2, crit: 0.3, knock: 260, stop: 0.07, shake: 6, tracer: 0xffe8a0,
+  },
+  {
+    id: 'g_musket', kind: 'musket', name: '플린트락 머스킷', rarity: 'epic', price: 7400,
+    desc: '부싯돌이 칙 하고 튄 다음 펑. 꽂을대로 화약을 다져 넣어요.', hold: '두 손 · 꽂을대 장전',
+    dmg: 150, rate: 0.6, mag: 1, reload: 2.1, range: 300, spread: 0, pellets: 1, pierce: 3, crit: 0.25, knock: 300, stop: 0.09, shake: 7, tracer: 0xfff4d8,
+  },
+  {
+    id: 'g_launcher', kind: 'launcher', name: '회전식 유탄발사기', rarity: 'legendary', price: 21500,
+    desc: '맞은 곳이 폭발해요. 드럼 탄창이 한 칸씩 돌아가요.', hold: '두 손 · 허리 견착',
+    dmg: 70, rate: 1.15, mag: 6, reload: 0.34, range: 210, spread: 0.02, pellets: 1, pierce: 0, crit: 0.05, knock: 120, stop: 0.07, shake: 6, tracer: 0xffa040, splash: 38,
+  },
 ];
 
 // ---------------- swords ----------------
-export type SwordKind = 'dagger' | 'longsword' | 'rapier' | 'katana' | 'greatsword' | 'scythe';
+export type SwordKind =
+  | 'dagger' | 'longsword' | 'rapier' | 'katana' | 'greatsword' | 'scythe'
+  | 'saber' | 'cleaver' | 'katar' | 'spear' | 'nodachi' | 'twinblade' | 'whip' | 'plasma';
 
 export interface SwordDef {
   id: string;
@@ -134,6 +184,46 @@ export const SWORDS: SwordDef[] = [
     id: 's_scythe', kind: 'scythe', name: '사신의 낫', rarity: 'legendary', price: 19500,
     desc: '몸을 한 바퀴 휘감아 주변 전부를 베어요. 패리도 모든 방향.', hold: '등 뒤 · 회전 베기',
     dmg: 46, reach: 42, arc: Math.PI * 2, windup: 0.08, swing: 0.26, hold_: 0.02, recover: 0.25, cooldown: 0.85, parry: 0.24, knock: 160, stop: 0.06, color: 0xc49bff,
+  },
+  {
+    id: 's_saber', kind: 'saber', name: '기병 세이버', rarity: 'common', price: 280,
+    desc: '한 번 휘두를 때 갔다가 돌아오며 두 번 베어요.', hold: '한 손 · 왕복 베기',
+    dmg: 12, reach: 25, arc: 2.2, windup: 0.04, swing: 0.16, hold_: 0.02, recover: 0.16, cooldown: 0.46, parry: 0.16, knock: 70, stop: 0.035, color: 0xe4ecf6,
+  },
+  {
+    id: 's_cleaver', kind: 'cleaver', name: '정육 클리버', rarity: 'common', price: 340,
+    desc: '높이 들었다가 묵직하게 내려찍어요. 치명타가 잘 나요.', hold: '한 손 · 내려찍기',
+    dmg: 27, reach: 20, arc: 1.5, windup: 0.09, swing: 0.06, hold_: 0.06, recover: 0.2, cooldown: 0.52, parry: 0.14, knock: 160, stop: 0.07, color: 0xc8ccd6,
+  },
+  {
+    id: 's_katar', kind: 'katar', name: '카타르', rarity: 'uncommon', price: 950,
+    desc: '주먹에 끼운 단검. 빠르게 세 번 찔러요.', hold: '주먹 · 연속 찌르기',
+    dmg: 9, reach: 23, arc: 0.7, windup: 0.03, swing: 0.18, hold_: 0.02, recover: 0.1, cooldown: 0.36, parry: 0.2, knock: 45, stop: 0.025, color: 0xf0e0c0,
+  },
+  {
+    id: 's_spear', kind: 'spear', name: '장창', rarity: 'uncommon', price: 1300,
+    desc: '창을 한 바퀴 돌려 기세를 모은 다음 길게 찔러요. 일직선을 꿰뚫어요.', hold: '두 손 · 회전 후 찌르기',
+    dmg: 23, reach: 48, arc: 0.5, windup: 0.14, swing: 0.06, hold_: 0.06, recover: 0.2, cooldown: 0.62, parry: 0.2, knock: 140, stop: 0.05, color: 0xd8dce8,
+  },
+  {
+    id: 's_nodachi', kind: 'nodachi', name: '노다치', rarity: 'rare', price: 3400,
+    desc: '등에 멘 긴 칼을 어깨 너머로 뽑아 크게 휩쓸어요.', hold: '등 · 어깨 너머 발도',
+    dmg: 40, reach: 44, arc: 4.4, windup: 0.08, swing: 0.13, hold_: 0.08, recover: 0.32, cooldown: 0.95, parry: 0.2, knock: 180, stop: 0.07, color: 0xd6e8ff,
+  },
+  {
+    id: 's_twinblade', kind: 'twinblade', name: '쌍날검', rarity: 'rare', price: 3800,
+    desc: '양끝에 날이 달린 봉을 손에서 빙빙 돌려 앞을 갈아버려요.', hold: '두 손 · 손안 회전',
+    dmg: 16, reach: 22, arc: Math.PI * 2, windup: 0.04, swing: 0.3, hold_: 0.02, recover: 0.18, cooldown: 0.7, parry: 0.22, knock: 90, stop: 0.035, color: 0xffb070,
+  },
+  {
+    id: 's_whip', kind: 'whip', name: '사복검', rarity: 'epic', price: 8800,
+    desc: '칼날이 마디로 갈라져 채찍처럼 뻗었다가 다시 붙어요.', hold: '한 손 · 채찍 베기',
+    dmg: 30, reach: 60, arc: 2.4, windup: 0.07, swing: 0.2, hold_: 0.05, recover: 0.26, cooldown: 0.85, parry: 0.18, knock: 120, stop: 0.055, color: 0x9ff0c8,
+  },
+  {
+    id: 's_plasma', kind: 'plasma', name: '플라즈마 블레이드', rarity: 'legendary', price: 21500,
+    desc: '평소엔 손잡이뿐. 벨 때 빛의 날이 켜졌다가 꺼져요.', hold: '허리 · 점화 베기',
+    dmg: 42, reach: 34, arc: 3.2, windup: 0.03, swing: 0.07, hold_: 0.04, recover: 0.2, cooldown: 0.42, parry: 0.22, knock: 120, stop: 0.05, color: 0x7af6ff,
   },
 ];
 

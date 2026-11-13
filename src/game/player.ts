@@ -44,7 +44,9 @@ export class Player {
   get speed() {
     let s = 92 * this.run.mods.speed;
     if (this.gun.def.kind === 'minigun' && this.gun.firing > 0) s *= 0.8;
-    if (this.sword.def.kind === 'greatsword' && this.sword.busy) s *= 0.7;
+    const sk = this.sword.def.kind;
+    if ((sk === 'greatsword' || sk === 'nodachi') && this.sword.busy) s *= 0.7;
+    if (this.gun.def.kind === 'musket' && this.gun.reloading) s *= 0.75;
     return s;
   }
 
@@ -151,7 +153,10 @@ export class Player {
     const blink = this.inv > 0 && !this.dead && Math.sin(time * 50) > 0 && this.hurtFlash > 0;
     const gunBehind = Math.sin(this.gun.aim) < -0.35;
     const swordBehind = Math.sin(this.sword.ang) < -0.2 && this.sword.state === 'rest';
-    const swordHand = this.sword.busy || !this.gun.hold.two || this.sword.def.kind === 'dagger' || this.sword.def.kind === 'rapier' || this.sword.def.kind === 'longsword';
+    // stowed blades (saya, back, belt, shoulder) rest without a hand when the gun needs both
+    const sk = this.sword.def.kind;
+    const inHand = sk === 'dagger' || sk === 'rapier' || sk === 'longsword' || sk === 'saber' || sk === 'katar' || sk === 'cleaver' || sk === 'spear' || sk === 'twinblade' || sk === 'whip';
+    const swordHand = this.sword.busy || !this.gun.hold.two || inHand;
     const offhandBusy = this.sword.busy;
 
     if (swordBehind) this.sword.draw(g, hc, time, swordHand);

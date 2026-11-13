@@ -36,12 +36,22 @@ export interface GunPose {
   cells: number; // railgun coil charge 0..4
   charge: number; // 0..1 railgun shot charge
   cell: number; // railgun battery offset (<0 hidden)
+  tip: number; // derringer barrels tipped up 0..1
+  lever: number; // lever-action loop swung down 0..1
+  brk: number; // break-action barrels hinged open 0..1
+  drum: number; // launcher drum rotation (chambers)
+  drumOut: number; // launcher drum swung out 0..1
+  heat: number; // laser heat 0..1
+  fins: number; // laser vents open 0..1
+  rod: number; // musket ramrod: <0 stowed, 0..1 depth in the barrel
+  hammer: number; // musket hammer cocked 0..1
+  pan: number; // musket flash-pan flare 0..1
   hand2: [number, number] | null;
   handC: number;
 }
 
 export const blankPose = (): GunPose => ({
-  slide: 0, mag: 0, cyl: 0, pump: 0, bolt: 0, boltUp: 0, handle: 0, box: 0, barrel: 0, gap: 0, cells: 4, charge: 0, cell: 0, hand2: null, handC: 0x999999,
+  slide: 0, mag: 0, cyl: 0, pump: 0, bolt: 0, boltUp: 0, handle: 0, box: 0, barrel: 0, gap: 0, cells: 4, charge: 0, cell: 0, tip: 0, lever: 0, brk: 0, drum: 0, drumOut: 0, heat: 0, fins: 0, rod: -1, hammer: 1, pan: 0, hand2: null, handC: 0x999999,
 });
 
 export const MUZZLE: Record<GunKind, [number, number]> = {
@@ -52,10 +62,19 @@ export const MUZZLE: Record<GunKind, [number, number]> = {
   sniper: [24, -3],
   minigun: [20, -3.5],
   railgun: [20, -3.5],
+  derringer: [7, -3.2],
+  lever: [19, -3.8],
+  rifle: [18, -3.2],
+  laser: [12.5, -3],
+  dbarrel: [12, -2.6],
+  cannon: [12.5, -4],
+  musket: [27, -3.3],
+  launcher: [19, -4],
 };
 /** where casings leave the gun */
 export const PORT: Record<GunKind, [number, number]> = {
   pistol: [3, -4], revolver: [1, -3], smg: [4, -4], shotgun: [1, -4], sniper: [-1, -4], minigun: [-2, -2], railgun: [-4, -4],
+  derringer: [1, -4], lever: [1, -5], rifle: [3, -5], laser: [2, -5], dbarrel: [2, -3], cannon: [4, -5.5], musket: [-1, -5], launcher: [2, -5],
 };
 
 export function hand(x: Xf, u: number, v: number, c: number) {
@@ -205,6 +224,184 @@ export function drawGun(x: Xf, kind: GunKind, p: GunPose, time: number) {
       }
       break;
     }
+
+    case 'derringer': {
+      x.q(-2.5, -1, 3, 3.5, 0xe8e0d0); // pearl grip
+      x.q(-2.5, -1, 1, 3.5, 0xffffff);
+      x.q(-2.5, 2, 3, 0.8, K.brass);
+      x.q(-1.5, -2.5, 3, 1.6, K.brass); // frame
+      x.q(0.5, -1, 1.5, 1.2, K.brassD); // spur trigger
+      x.q(-2.5, -3.8, 1.5, 1, K.dark); // hammer
+      // over-under barrels tip up on the hinge at the front of the frame
+      const [hx, hy] = x.pt(0.2, -2.4);
+      const B = new Xf(x.g, hx, hy, x.ang - p.tip * 1.1 * x.fy, x.fy);
+      B.q(0, -2.6, 7, 1.3, K.light);
+      B.q(0, -2.6, 7, 0.6, K.shine);
+      B.q(0, -1.3, 7, 1.3, K.steel);
+      B.q(6.4, -2.6, 0.8, 2.6, K.metal);
+      if (p.tip > 0.3) {
+        B.q(-0.2, -2.4, 0.6, 1, K.brass);
+        B.q(-0.2, -1.1, 0.6, 1, K.brass);
+      }
+      break;
+    }
+    case 'lever': {
+      x.q(-8, -3.2, 6, 3, K.wood); // short stock
+      x.q(-8, -3.2, 6, 1, K.woodL);
+      x.q(-8.5, -3.8, 1.5, 4, K.wood);
+      x.q(-2, -4.3, 6, 3.2, 0xa07a30); // brass receiver
+      x.q(-2, -4.3, 6, 1, 0xd8b058);
+      x.q(-0.5, -3.3, 1, 1, K.dark); // loading gate
+      x.q(4, -4.8, 15, 1.4, K.metal); // barrel
+      x.q(4, -4.8, 15, 0.6, K.steel);
+      x.q(4, -3.4, 12, 1.2, K.dark); // tube magazine
+      x.q(5, -3.6, 7, 2.2, K.wood); // forend
+      x.q(5, -3.6, 7, 0.8, K.woodL);
+      x.q(17.5, -5.6, 1, 1, K.steel); // sight
+      // the big loop lever swings down from under the receiver
+      const [lx, ly] = x.pt(1, -1.2);
+      const L = new Xf(x.g, lx, ly, x.ang + p.lever * 0.9 * x.fy, x.fy);
+      L.q(-3, 0, 4, 0.9, K.dark);
+      L.q(-3, 2.6, 4.5, 0.9, K.dark);
+      L.q(1, 0, 0.9, 3.4, K.dark);
+      L.q(-3, 0, 0.9, 3.4, K.dark);
+      break;
+    }
+    case 'rifle': {
+      x.q(-10, -3.6, 5.5, 3, K.dark); // stock
+      x.q(-10, -4, 1.2, 4.2, K.dark);
+      x.q(-4.5, -3.2, 2.5, 1.4, K.metal); // buffer tube
+      x.q(-1, -1, 2, 3.5, K.dark); // grip
+      if (p.mag >= 0) {
+        // curved magazine
+        x.q(2.2, -1 + p.mag, 2.3, 3.5, K.ink);
+        x.q(2.9, 2.2 + p.mag, 2.3, 2.6, K.ink);
+        x.q(2.2, -1 + p.mag, 0.8, 3.5, K.metal);
+      }
+      x.q(-2, -4.6, 9, 3.5, K.metal); // receiver
+      x.q(-2, -4.6, 9, 1, K.steel);
+      x.q(7, -4.2, 7, 2.6, K.dark); // handguard
+      for (let i = 0; i < 3; i++) x.q(8 + i * 2, -3.4, 1, 0.8, K.ink);
+      x.q(14, -3.6, 4, 1, K.dark); // barrel
+      x.q(13, -5.8, 1, 1.8, K.dark); // front sight
+      x.q(0, -6.6, 4.5, 1.6, K.dark); // red dot
+      x.q(3.6, -6.3, 0.9, 1, 0xff4a4a);
+      x.glow(4, -5.8, 3, 0xff3a3a, 0.15);
+      x.q(-2 - p.handle * 3, -5.4, 1.6, 0.8, K.steel); // charging handle
+      break;
+    }
+    case 'laser': {
+      const heatC = p.heat < 0.5 ? mix(0x6af0ff, 0xff6ad8, p.heat * 2) : mix(0xff6ad8, 0xffe0a0, (p.heat - 0.5) * 2);
+      x.q(-2, -1, 3, 4, 0x3a3a50); // grip
+      x.q(-2, -1, 1, 4, 0x5a5a74);
+      x.q(-3, -5, 11, 4, 0xe4e8f2); // white shell
+      x.q(-3, -5, 11, 1, 0xffffff);
+      x.q(-3, -2, 10, 1, 0xa8b0c8);
+      // vent fins lift off the top when it overheats
+      const fo = p.fins * 2.2;
+      x.q(-1, -6 - fo, 7, 1, 0xc8d0e0);
+      x.q(-1, -6 - fo, 7, 0.4, 0xffffff);
+      for (let i = 0; i < 3; i++) {
+        x.q(0 + i * 2.5, -3.8, 1.6, 1.6, heatC); // heat cells
+        x.glow(0.8 + i * 2.5, -3, 3, heatC, 0.15 + p.heat * 0.35);
+      }
+      x.q(8, -5.6, 2, 5.2, 0x3a3a50); // emitter collar
+      x.q(10, -4, 2.5, 2, 0xff6ad8);
+      x.q(10.5, -3.6, 1.5, 1.2, 0xffffff);
+      x.glow(11, -3, 5, 0xff6ad8, 0.3 + p.heat * 0.3);
+      break;
+    }
+    case 'dbarrel': {
+      x.q(-4.5, -1, 3, 4.2, K.wood); // pistol grip
+      x.q(-4.5, -1, 1, 4.2, K.woodL);
+      x.q(-5, 2.6, 3.5, 1, K.wood);
+      x.q(-2.5, -4, 4.5, 3.4, K.metal); // action
+      x.q(-2.5, -4, 4.5, 1, K.steel);
+      x.q(-0.5, -0.6, 2, 1.2, K.dark);
+      x.q(-3, -5, 1.2, 1.2, K.dark); // hammers
+      // barrels drop open on the hinge
+      const [hx, hy] = x.pt(2, -1.2);
+      const B = new Xf(x.g, hx, hy, x.ang + p.brk * 0.75 * x.fy, x.fy);
+      B.q(0, -2.8, 10, 1.4, K.light);
+      B.q(0, -2.8, 10, 0.5, K.shine);
+      B.q(0, -1.4, 10, 1.4, K.steel);
+      B.q(0, 0, 6, 1, K.wood); // forend
+      B.q(9.4, -2.8, 0.8, 2.8, K.metal);
+      if (p.brk > 0.4) {
+        B.q(-0.3, -2.6, 0.6, 1.1, 0xd0403a);
+        B.q(-0.3, -1.2, 0.6, 1.1, 0xd0403a);
+      }
+      break;
+    }
+    case 'cannon': {
+      const s = -p.slide * 3.5;
+      x.q(-3, -1, 3.6, 4.6, K.dark); // grip
+      x.q(-3, -1, 1, 4.6, K.metal);
+      if (p.mag >= 0) x.q(-2.6, 3.6 + p.mag, 3, 1.2, K.steel);
+      x.q(-2, -2.6, 10, 2, K.metal); // frame
+      x.q(1, -0.6, 3, 1.2, K.dark); // trigger guard
+      x.q(-3 + s, -6, 15, 3.4, 0xc8ccd8); // big slide
+      x.q(-3 + s, -6, 15, 1, K.shine);
+      x.q(-2 + s, -4, 2, 1, K.dark); // serrations
+      x.q(6 + s, -5, 5, 1, K.brass);
+      x.q(11.5 + s, -5.6, 1.2, 2.6, K.steel);
+      x.q(-3.5, -6.8, 1.5, 1, K.dark); // hammer
+      break;
+    }
+    case 'musket': {
+      // ramrod first so the barrel hides the part that's inside
+      if (p.rod >= 0) {
+        const depth = p.rod * 18;
+        x.q(27 - depth, -3.9, 20, 0.7, 0xd8c8a0);
+        x.q(27 - depth + 19, -4.2, 1.2, 1.3, K.brass);
+      }
+      x.q(-14, -3, 13, 3.2, K.wood); // stock
+      x.q(-14, -3, 13, 1, K.woodL);
+      x.q(-15, -4, 2, 5.4, K.wood); // butt
+      x.q(0, -2.6, 21, 1.8, K.woodL); // forestock
+      x.q(0, -4.2, 27, 1.6, K.metal); // long barrel
+      x.q(0, -4.2, 27, 0.6, K.steel);
+      x.q(8, -4.4, 1, 3.6, K.brass); // bands
+      x.q(18, -4.4, 1, 3.6, K.brass);
+      if (p.rod < 0) x.q(3, -0.9, 19, 0.7, 0xd8c8a0); // stowed ramrod
+      x.q(-3.5, -4.8, 5, 2.4, K.metal); // lock plate
+      x.q(-0.5, -5.2, 2, 1, K.brass); // pan
+      // hammer with its flint: cocked back, or fallen forward onto the pan
+      const [hx, hy] = x.pt(-2.5, -4.5);
+      const H = new Xf(x.g, hx, hy, x.ang + (-0.9 + p.hammer * 1.5) * x.fy, x.fy);
+      H.q(-0.5, -3, 1.2, 3, K.dark);
+      H.q(-0.6, -3.6, 1.6, 1, 0x9a8a70);
+      if (p.pan > 0) {
+        x.q(0, -6.5, 1.5, 1.5, 0xffffff, p.pan);
+        x.glow(0.5, -5.6, 6, 0xffb060, 0.9 * p.pan);
+      }
+      break;
+    }
+    case 'launcher': {
+      x.q(-10, -4.4, 6.5, 1.4, K.dark); // skeleton stock
+      x.q(-10, -4.4, 1.4, 5.4, K.dark);
+      x.q(-10, -0.4, 6, 1, K.dark);
+      x.q(-3.5, -3.6, 3.5, 1.4, K.metal);
+      x.q(-2, -1, 2, 3.8, K.dark); // grip
+      // the revolving drum, swung out for loading
+      const dv = p.drumOut * 3.5;
+      x.q(0, -7.5 + dv, 8, 7.5, K.olive);
+      x.q(0, -7.5 + dv, 8, 1, K.oliveL);
+      for (let i = 0; i < 4; i++) {
+        const ph = ((i + p.drum) % 4) / 4;
+        const v = -7 + dv + ph * 6.8;
+        const front = Math.sin(ph * Math.PI);
+        x.q(0.6, v, 6.8, 1.1, front > 0.6 ? K.oliveL : mix(K.olive, 0x000000, 0.35));
+        if (front > 0.6) x.q(0.6, v, 0.8, 1.1, K.brass);
+      }
+      x.q(8, -6, 10, 3.2, K.metal); // fat barrel
+      x.q(8, -6, 10, 1, K.steel);
+      x.q(17.4, -6.6, 1.6, 4.4, K.dark);
+      x.q(10, -2.8, 1.6, 3.4, K.dark); // foregrip
+      x.q(-1, -8.8, 12, 1, K.dark); // rail
+      x.q(6, -10.2, 2, 1.4, K.dark);
+      break;
+    }
   }
   if (p.hand2) hand(x, p.hand2[0], p.hand2[1], p.handC);
   void g;
@@ -218,9 +415,18 @@ export const BLADE_LEN: Record<SwordKind, number> = {
   katana: 19,
   greatsword: 25,
   scythe: 18,
+  saber: 16,
+  cleaver: 11,
+  katar: 9,
+  spear: 30,
+  nodachi: 27,
+  twinblade: 23,
+  whip: 15,
+  plasma: 21,
 };
 
-export function drawSword(x: Xf, kind: SwordKind, color: number, time: number, sheathed = false) {
+/** `amt`: plasma ignition / whip blade closed (1) or flying out as a chain (handled by the controller) */
+export function drawSword(x: Xf, kind: SwordKind, color: number, time: number, sheathed = false, amt = 1, chainOut = false) {
   const hi = mix(color, 0xffffff, 0.6);
   const lo = mix(color, 0x202030, 0.45);
   switch (kind) {
@@ -327,6 +533,127 @@ export function drawSword(x: Xf, kind: SwordKind, color: number, time: number, s
       for (let i = 0; i < 8; i++) {
         const [u0, v0] = pts[i];
         x.glow(u0, v0, 4, 0xb07aff, 0.07);
+      }
+      break;
+    }
+    case 'saber': {
+      x.q(-5, -1, 5, 2, 0x3a2a24); // grip
+      x.q(-6, -1.2, 1, 2.4, K.brass);
+      x.q(-5, 1.6, 5.5, 0.8, K.brass); // knuckle bow
+      x.q(-0.5, -2.2, 1.2, 4.6, K.brass);
+      // single-edged, curving more toward the tip
+      for (let i = 0; i < 5; i++) {
+        const u = 0.7 + i * 3, curve = -(i * i) * 0.09;
+        x.q(u, -1.2 + curve, 3.2, 2.2, lo);
+        x.q(u, -1.2 + curve, 3.2, 0.9, color);
+        x.q(u, 0.6 + curve, 3.2, 0.5, 0xffffff);
+      }
+      x.tri(15.7, -1.2 - 1.44, 15.7, 1 - 1.44, 18.4, -2.2, color);
+      break;
+    }
+    case 'cleaver': {
+      x.q(-5.5, -1, 5.5, 2, K.wood);
+      x.q(-5.5, -1, 5.5, 0.7, K.woodL);
+      x.q(-4.5, -0.4, 0.8, 0.8, K.brass); // rivets
+      x.q(-2.5, -0.4, 0.8, 0.8, K.brass);
+      x.q(0, -4.2, 11, 6, lo); // slab blade
+      x.q(0, -4.2, 11, 1.6, color);
+      x.q(0, 1.2, 11, 0.6, 0xffffff); // edge
+      x.q(0, -4.2, 0.8, 6, mix(lo, 0x000000, 0.3));
+      x.q(8, -3.2, 1.4, 1.4, 0x14121f); // hanging hole
+      break;
+    }
+    case 'katar': {
+      // H-shaped grip: the fist closes on the crossbar, side bars along the forearm
+      x.q(-4.5, -2.6, 4.5, 0.9, K.brass);
+      x.q(-4.5, 1.7, 4.5, 0.9, K.brass);
+      x.q(-1.4, -2.6, 0.9, 5.2, K.brassD);
+      x.q(-0.2, -2.6, 0.8, 5.2, K.brass);
+      x.tri(0.6, -2.2, 0.6, 2.2, 9.5, 0, lo);
+      x.tri(0.6, -2.2, 0.6, 0, 9.5, 0, color);
+      x.q(1, -0.3, 6, 0.6, hi);
+      break;
+    }
+    case 'spear': {
+      x.q(-18, -0.8, 40, 1.6, 0x5a3a24); // shaft
+      x.q(-18, -0.8, 40, 0.5, 0x7a5434);
+      x.q(-18.5, -1.1, 1.2, 2.2, K.metal); // butt cap
+      for (let i = 0; i < 3; i++) x.q(-3 + i * 1.6, -0.9, 0.6, 1.8, 0x3a2418); // wrap
+      x.q(19, -1.8, 1.2, 3.6, 0xc83a3a); // tassel
+      x.q(19.2, 1.6, 0.8, 1.4, 0xa02a2a);
+      x.q(21.5, -1.2, 2.2, 2.4, K.brass); // socket
+      x.tri(23.5, -2.3, 23.5, 2.3, 31, 0, lo);
+      x.tri(23.5, -2.3, 23.5, 0, 31, 0, color);
+      x.q(24, -0.3, 5, 0.6, hi);
+      break;
+    }
+    case 'nodachi': {
+      x.q(-10, -1, 10, 2, 0x1a1420); // long tsuka
+      for (let i = 0; i < 4; i++) x.tri(-9.5 + i * 2.3, -1, -8.4 + i * 2.3, 0, -9.5 + i * 2.3, 1, 0xd8d0e8);
+      x.q(-10.5, -1, 0.8, 2, K.brass);
+      x.q(0, -2.4, 1.1, 4.8, K.brass); // tsuba
+      if (sheathed) {
+        x.q(1, -1.7, 27, 3.4, 0x20142a);
+        x.q(1, -1.7, 27, 1, 0x4a3a66);
+        x.q(1, -1.7, 2, 3.4, 0x0e0816);
+        x.q(27, -1.7, 1.5, 3.4, K.brass);
+      } else {
+        for (let i = 0; i < 9; i++) {
+          const u = 1 + i * 3, curve = -(i * i) * 0.025;
+          x.q(u, -1 + curve, 3.2, 2, lo);
+          x.q(u, -1 + curve, 3.2, 0.8, color);
+          x.q(u, 0.4 + curve, 3.2, 0.6, 0xffffff);
+        }
+        x.tri(28, -1 - 1.6, 28, 1 - 1.6, 30.5, -2.1, color);
+      }
+      break;
+    }
+    case 'twinblade': {
+      x.q(-10, -1, 20, 2, 0x2a2232); // staff
+      x.q(-10, -1, 20, 0.6, 0x4a3e58);
+      x.q(-1.5, -1.2, 3, 2.4, 0x6a3a24); // centre grip
+      for (const sgn of [1, -1]) {
+        x.q(sgn > 0 ? 9 : -10.5, -1.6, 1.5, 3.2, K.brass);
+        const b0 = sgn > 0 ? 10.5 : -20.5;
+        x.q(b0, -1.3, 10, 2.6, lo);
+        x.q(b0, -1.3, 10, 1, color);
+        x.q(b0 + 1, 0.8, 8, 0.5, 0xffffff);
+        if (sgn > 0) x.tri(20.5, -1.3, 20.5, 1.3, 23.5, 0, color);
+        else x.tri(-20.5, -1.3, -20.5, 1.3, -23.5, 0, color);
+      }
+      break;
+    }
+    case 'whip': {
+      x.q(-5, -1, 5, 2, 0x24343a);
+      x.q(-6, -1.3, 1, 2.6, K.metal);
+      x.q(-0.2, -2.6, 1.4, 5.2, 0x4a6a6a); // guard
+      if (!chainOut) {
+        // the blade at rest: plates snapped together, seams visible
+        for (let i = 0; i < 5; i++) {
+          x.q(1.4 + i * 2.7, -1.2, 2.4, 2.4, lo);
+          x.q(1.4 + i * 2.7, -1.2, 2.4, 0.9, color);
+          x.q(1.4 + i * 2.7, 0.7, 2.4, 0.5, hi);
+        }
+        x.tri(14.9, -1.2, 14.9, 1.2, 17.5, 0, color);
+      }
+      break;
+    }
+    case 'plasma': {
+      x.q(-5, -1.3, 6, 2.6, 0x6a6a7c); // hilt
+      x.q(-4, -1.3, 0.8, 2.6, 0x2a2a3a);
+      x.q(-1.8, -1.3, 0.8, 2.6, 0x2a2a3a);
+      x.q(-5.5, -1, 0.6, 2, 0x3a3a4a);
+      x.q(1, -1.6, 1.2, 3.2, 0xa0a0b4); // emitter
+      x.q(-3, 1.2, 1.5, 0.8, 0xff4a6a); // button
+      if (amt > 0.01) {
+        const L = 20 * amt;
+        const flick = 0.8 + 0.2 * Math.sin(time * 70);
+        x.q(2.2, -1.8, L, 3.6, color, 0.55); // outer glow body
+        x.q(2.2, -1.1, L, 2.2, mix(color, 0xffffff, 0.5));
+        x.q(2.2, -0.5, L + 0.5, 1, 0xffffff); // white core
+        x.tri(2.2 + L, -1.1, 2.2 + L, 1.1, 3.6 + L, 0, mix(color, 0xffffff, 0.5));
+        const [ax, ay] = x.pt(2.2, 0), [bx, by] = x.pt(2.2 + L, 0);
+        x.g.glowLine(ax, ay, bx, by, 6, color, 0.45 * flick * amt);
       }
       break;
     }
