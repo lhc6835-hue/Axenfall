@@ -92,7 +92,7 @@ export class Player {
     this.walk += spd * dt * 0.12;
     const bounce = spd > 10 ? Math.abs(Math.sin(this.walk)) * 0.08 : 0;
     const dashS = this.dashT > 0 ? 0.25 : 0;
-    const crouch = this.sword.squash * 0.25;
+    const crouch = this.sword.squash * 0.25 - this.sword.hop * 0.22;
     this.sx = lerp(this.sx, 1 + bounce * 0.5 + dashS + crouch, Math.min(1, dt * 20));
     this.sy = lerp(this.sy, 1 - bounce - dashS * 0.6 - crouch, Math.min(1, dt * 20));
 
@@ -163,7 +163,8 @@ export class Player {
     if (gunBehind) this.gun.draw(g, hc, offhandBusy, time);
     if (!blink) {
       const flashW = this.hurtFlash > 0.15 ? 1 : 0;
-      drawCube(g, skin, this.x, this.y - 1, this.size, this.tilt, time, this.sx, this.sy, flashW);
+      const hop = Math.sin(Math.min(1, this.sword.hop) * Math.PI) * 3;
+      drawCube(g, skin, this.x, this.y - 1 - hop, this.size, this.tilt + this.sword.bodyRot, time, this.sx, this.sy, flashW);
     }
     if (!gunBehind) this.gun.draw(g, hc, offhandBusy, time);
     if (!swordBehind) this.sword.draw(g, hc, time, swordHand);

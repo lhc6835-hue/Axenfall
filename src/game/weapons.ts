@@ -930,14 +930,122 @@ export class GunCtl {
 // =====================================================================
 // Sword
 // =====================================================================
-type SState = 'rest' | 'windup' | 'swing' | 'hold' | 'recover';
+type SState = 'rest' | 'windup' | 'swing' | 'hold' | 'recover' | 'deflect';
 
 interface TrailPt { tx: number; ty: number; mx: number; my: number; age: number }
 
 type Motion = 'arc' | 'thrust' | 'jabs' | 'double' | 'handspin' | 'whip';
-const MOTION: Record<SwordKind, Motion> = {
-  dagger: 'arc', longsword: 'arc', rapier: 'thrust', katana: 'arc', greatsword: 'arc', scythe: 'arc',
-  saber: 'double', cleaver: 'arc', katar: 'jabs', spear: 'thrust', nodachi: 'arc', twinblade: 'handspin', whip: 'whip', plasma: 'arc',
+/**
+ * One technique in a sword's combo.
+ * dir: which way the blade travels on screen. 'up' = rising cut (from below to above),
+ * 'down' = overhead cut, 'alt' = opposite of the previous cut, 'rest' = starting from where the blade rests.
+ */
+interface Move {
+  m: Motion;
+  dir: 'up' | 'down' | 'alt' | 'rest';
+  /** radians swept (arc / double); over 2*PI is a spinning cut */
+  span: number;
+  /** starts further back on the starting side */
+  bias?: number;
+  /** wind-up pull-back past the start */
+  cock?: number;
+  /** hand distance at start / end, and an outward bulge mid-swing (elliptical path) */
+  rIn?: number;
+  rOut?: number;
+  bulge?: number;
+  /** timing multipliers on the sword's windup / swing / hold / recover */
+  tw?: number;
+  ts?: number;
+  th?: number;
+  tr?: number;
+  dmg?: number;
+  reach?: number;
+  lunge?: number;
+  /** blade twirls in the hand during recovery (turns) */
+  twirl?: number;
+  /** the whole body spins with the cut */
+  body?: boolean;
+  /** jump into the cut (rising) / crouch into it (overhead) */
+  hop?: number;
+  /** thrusts: the spear-style full twirl on the way in */
+  twirlIn?: boolean;
+  /** finisher: bigger hit-stop and shake */
+  fin?: boolean;
+}
+const S = Math.PI;
+/** each sword's combo; quick follow-ups walk through it, a pause starts over */
+const MOVES: Record<SwordKind, Move[]> = {
+  dagger: [
+    { m: 'arc', dir: 'rest', span: 2.0, rIn: 7, rOut: 10, bulge: 2 },
+    { m: 'arc', dir: 'alt', span: 2.2, rIn: 6, rOut: 10, bulge: 2, twirl: 1 },
+    { m: 'arc', dir: 'up', span: S * 2 + 0.4, rIn: 5, rOut: 6, ts: 2.6, body: true, dmg: 1.3, twirl: 2, fin: true },
+  ],
+  longsword: [
+    { m: 'arc', dir: 'down', span: 2.6, bias: 0.3, rIn: 6, rOut: 10, bulge: 3, hop: -1 },
+    { m: 'arc', dir: 'up', span: 2.9, bias: 0.5, rIn: 5, rOut: 11, bulge: 3, hop: 1 },
+    { m: 'thrust', dir: 'rest', span: 0, ts: 1.3, reach: 1.35, lunge: 1.6, dmg: 1.4, fin: true, twirl: 1 },
+  ],
+  rapier: [
+    { m: 'thrust', dir: 'rest', span: 0 },
+    { m: 'thrust', dir: 'rest', span: 0, ts: 0.85 },
+    { m: 'arc', dir: 'up', span: 2.4, rIn: 6, rOut: 12, bulge: 4, dmg: 1.2, twirl: 1 },
+    { m: 'thrust', dir: 'rest', span: 0, ts: 1.4, reach: 1.4, lunge: 2.2, dmg: 1.6, fin: true },
+  ],
+  katana: [
+    { m: 'arc', dir: 'up', span: 3.6, bias: 0.3, rIn: 6, rOut: 11, bulge: 3 },
+    { m: 'arc', dir: 'alt', span: 3.0, rIn: 8, rOut: 10, bulge: 2, tw: 0.6, th: 0.4 },
+    { m: 'arc', dir: 'down', span: S * 2 + 0.8, rIn: 7, rOut: 7, ts: 2.2, body: true, dmg: 1.5, fin: true },
+  ],
+  greatsword: [
+    { m: 'arc', dir: 'down', span: 3.2, bias: 0.6, cock: 0.7, rIn: 5, rOut: 10, bulge: 3, hop: -1 },
+    { m: 'arc', dir: 'up', span: 3.4, bias: 0.4, rIn: 6, rOut: 11, bulge: 2, hop: 1, ts: 1.1 },
+    { m: 'arc', dir: 'down', span: S * 2 + 0.6, rIn: 6, rOut: 6, ts: 2.3, body: true, dmg: 1.5, fin: true },
+  ],
+  scythe: [
+    { m: 'arc', dir: 'down', span: S * 2 + 0.6, rIn: 4, rOut: 5, body: true },
+    { m: 'arc', dir: 'alt', span: S * 2 + 0.6, rIn: 4, rOut: 5, body: true },
+    { m: 'arc', dir: 'up', span: S * 4 + 0.6, rIn: 5, rOut: 6, ts: 1.7, body: true, dmg: 1.4, fin: true },
+  ],
+  saber: [
+    { m: 'double', dir: 'down', span: 2.2, rIn: 8, rOut: 9, bulge: 2 },
+    { m: 'arc', dir: 'up', span: 2.8, bias: 0.4, rIn: 6, rOut: 11, bulge: 3, hop: 1, twirl: 1 },
+    { m: 'thrust', dir: 'rest', span: 0, reach: 1.3, lunge: 1.5, dmg: 1.5, fin: true },
+  ],
+  cleaver: [
+    { m: 'arc', dir: 'down', span: 1.6, bias: 0.6, cock: 1.0, rIn: 5, rOut: 9, hop: -1 },
+    { m: 'arc', dir: 'alt', span: 1.8, rIn: 6, rOut: 9, bulge: 2 },
+    { m: 'arc', dir: 'down', span: S * 2 + 0.4, rIn: 6, rOut: 6, ts: 2.6, body: true, dmg: 1.6, fin: true },
+  ],
+  katar: [
+    { m: 'jabs', dir: 'rest', span: 0 },
+    { m: 'jabs', dir: 'rest', span: 0, ts: 0.8 },
+    { m: 'arc', dir: 'up', span: 2.2, rIn: 4, rOut: 11, bulge: 2, hop: 1, dmg: 1.5, fin: true },
+  ],
+  spear: [
+    { m: 'thrust', dir: 'rest', span: 0, twirlIn: true },
+    { m: 'arc', dir: 'alt', span: 2.6, rIn: 4, rOut: 6, ts: 1.6, reach: 0.9 },
+    { m: 'arc', dir: 'down', span: S * 2 + 0.6, rIn: 2, rOut: 2, ts: 2.6, body: true, reach: 0.85, dmg: 1.3, fin: true },
+  ],
+  nodachi: [
+    { m: 'arc', dir: 'down', span: 4.4, bias: 0.3, rIn: 6, rOut: 9, bulge: 3 },
+    { m: 'arc', dir: 'up', span: 3.6, rIn: 7, rOut: 10, bulge: 2, hop: 1 },
+    { m: 'arc', dir: 'down', span: S * 2 + 1.0, rIn: 7, rOut: 7, ts: 1.9, body: true, dmg: 1.5, fin: true },
+  ],
+  twinblade: [
+    { m: 'handspin', dir: 'rest', span: 0 },
+    { m: 'handspin', dir: 'alt', span: 0 },
+    { m: 'arc', dir: 'up', span: S * 2 + 0.6, rIn: 3, rOut: 3, ts: 1.4, body: true, dmg: 1.4, fin: true },
+  ],
+  whip: [
+    { m: 'whip', dir: 'down', span: 2.4 },
+    { m: 'whip', dir: 'alt', span: 2.6 },
+    { m: 'whip', dir: 'up', span: S * 2 + 0.6, ts: 1.6, body: true, dmg: 1.3, fin: true },
+  ],
+  plasma: [
+    { m: 'arc', dir: 'up', span: 3.2, rIn: 6, rOut: 10, bulge: 3, hop: 1 },
+    { m: 'arc', dir: 'alt', span: 3.2, rIn: 6, rOut: 10, bulge: 2 },
+    { m: 'arc', dir: 'down', span: S * 3, rIn: 6, rOut: 7, ts: 2.2, body: true, dmg: 1.5, fin: true, twirl: 1 },
+  ],
 };
 /** how much the resting weapon leans toward where you look */
 const LEAN: Record<SwordKind, number> = {
@@ -957,7 +1065,7 @@ const WHIP_N = 10;
 export class SwordCtl {
   def: SwordDef;
   lvl: number;
-  motion: Motion;
+  move: Move;
   state: SState = 'rest';
   t = 0;
   cd = 0;
@@ -969,6 +1077,7 @@ export class SwordCtl {
   faceK = 1;
   private sinceFlip = 1;
   private sinceAttack = 9;
+  private comboIdx = -1;
   /** sign used to mirror the blade art */
   artFy = 1;
   /** absolute blade angle and hand pos */
@@ -985,14 +1094,23 @@ export class SwordCtl {
   twirlTimer = 1.5;
   combo = 0;
   hitStopDone = false;
-  /** body nudges for the owner (lunge, crouch) */
+  /** body nudges for the owner (lunge, crouch / hop, spin) */
   lunge = 0;
   squash = 0;
+  hop = 0;
+  bodyRot = 0;
   sheathClick = false;
   /** 0..1: plasma blade ignition / whip extension */
   ext = 0;
   private step = -1;
   chain: { x: number; y: number }[] = [];
+  /** parry reaction */
+  private defAng = 0;
+  private defGuard = 0;
+  private defFrom = 0;
+  private defSpin = 1;
+  private defDur = 0.3;
+  private defPerfect = false;
   /** owner centre, set by the player before drawing */
   hx0 = 0;
   hy0 = 0;
@@ -1000,7 +1118,7 @@ export class SwordCtl {
   constructor(def: SwordDef, lvl: number, private run: Run) {
     this.def = def;
     this.lvl = lvl;
-    this.motion = MOTION[def.kind];
+    this.move = MOVES[def.kind][0];
   }
 
   get busy() {
@@ -1015,19 +1133,35 @@ export class SwordCtl {
   parryWindow() {
     return this.def.parry + this.run.mods.parryWin;
   }
+  private dur(k: 'w' | 's' | 'h' | 'r') {
+    const d = this.def, m = this.move;
+    if (k === 'w') return d.windup * (m.tw ?? 1);
+    if (k === 's') return d.swing * (m.ts ?? 1);
+    if (k === 'h') return d.hold_ * (m.th ?? 1);
+    return d.recover * (m.tr ?? 1);
+  }
 
   /** start an attack toward angle a */
   attack(a: number) {
-    if (this.cd > 0 || (this.state !== 'rest' && this.state !== 'recover')) return false;
+    const canCancel = this.state === 'rest' || this.state === 'recover' || (this.state === 'deflect' && this.t > 0.1);
+    if (this.cd > 0 || !canCancel) return false;
+    const list = MOVES[this.def.kind];
+    // keep the combo going on quick follow-ups, start over after a pause
+    this.comboIdx = this.sinceAttack < 0.75 ? (this.comboIdx + 1) % list.length : 0;
+    const mv = list[this.comboIdx];
+    this.move = mv;
     this.aim = a;
     this.state = 'windup';
     this.t = 0;
-    this.cd = this.def.cooldown * Math.max(0.35, this.run.mods.swordCd);
-    const k = this.def.kind;
+    const fin = !!mv.fin;
+    this.cd = this.def.cooldown * Math.max(0.35, this.run.mods.swordCd) * (fin ? 1.25 : 1);
+    // which way the blade travels on screen
+    const face = Math.abs(Math.cos(a)) > 0.2 ? (Math.cos(a) >= 0 ? 1 : -1) : this.facing;
     const restSide = angDiff(a, this.restPose(0).ang) >= 0 ? 1 : -1;
-    const alternates = k === 'dagger' || k === 'longsword' || k === 'saber' || k === 'plasma' || k === 'whip';
-    // a fresh attack winds up from where the blade already is; quick follow-ups alternate
-    this.side = alternates && this.sinceAttack < 0.7 ? -this.side : restSide;
+    if (mv.dir === 'up') this.side = face;
+    else if (mv.dir === 'down') this.side = -face;
+    else if (mv.dir === 'alt') this.side = -this.side;
+    else this.side = restSide;
     this.sinceAttack = 0;
     this.combo++;
     this.hit.clear();
@@ -1039,16 +1173,41 @@ export class SwordCtl {
     this.trail2.length = 0;
     this.sheathClick = false;
     this.step = -1;
-    if (k === 'greatsword' || k === 'cleaver' || k === 'nodachi') this.squash = 1;
-    if (k === 'plasma') sfx.foley('ignite', 0.6, 1.2);
-    if (k === 'spear') sfx.spin();
+    const k = this.def.kind;
+    if (HEAVY[k] || mv.hop === -1) this.squash = 1;
+    if (k === 'plasma' && this.ext < 0.5) sfx.foley('ignite', 0.5, 1.2);
+    if (mv.twirlIn) sfx.spin();
     return true;
+  }
+
+  /** a successful parry: snap the blade across the blow, ride the recoil, twirl back to guard */
+  deflect(threat: number, perfect: boolean, interrupt = true) {
+    if (!interrupt && (this.state === 'swing' || this.state === 'windup')) return;
+    if (this.motionIs('whip')) return; // the chain whip keeps its own motion
+    this.state = 'deflect';
+    this.t = 0;
+    this.defAng = threat;
+    this.defFrom = this.ang;
+    // block with the blade crossways, on whichever side it already was
+    const g = angDiff(threat, this.ang) >= 0 ? 1 : -1;
+    this.defGuard = threat + g * Math.PI * 0.5;
+    this.defSpin = g;
+    this.defPerfect = perfect;
+    this.defDur = perfect ? 0.5 : 0.36;
+    this.trail.length = 0;
+    this.trail2.length = 0;
+    this.lunge = -0.6;
+    if (this.def.kind === 'plasma') this.ext = 1;
+  }
+
+  private motionIs(m: Motion) {
+    return this.move.m === m && this.state !== 'rest' && this.state !== 'deflect';
   }
 
   /** a parry is active and `a` (angle from owner to threat) is inside the guarded sector */
   guards(a: number) {
     if (this.parryT <= 0) return false;
-    if (this.def.arc >= 6) return true;
+    if (this.def.arc >= 6 || this.move.span >= 6) return true;
     const half = Math.max(this.def.arc / 2, 1.0) + 0.45;
     return Math.abs(angDiff(this.aim, a)) <= half;
   }
@@ -1058,17 +1217,17 @@ export class SwordCtl {
 
   /** swing path, in angles relative to aim */
   private path(): [number, number] {
-    const k = this.def.kind;
-    const half = this.def.arc / 2;
-    if (k === 'scythe') return [this.side * 0.5, this.side * 0.5 - this.side * (TAU + 0.6)];
-    if (this.motion === 'thrust' || this.motion === 'jabs') return [0, 0];
-    if (this.motion === 'handspin') return [this.side * Math.PI * 0.5, this.side * (Math.PI * 0.5 + Math.PI * 3)];
-    return [this.side * (half + 0.15), -this.side * (half + 0.25)];
+    const mv = this.move;
+    if (mv.m === 'thrust' || mv.m === 'jabs') return [0, 0];
+    if (mv.m === 'handspin') return [this.side * Math.PI * 0.5, this.side * (Math.PI * 0.5 + Math.PI * 3)];
+    const span = mv.m === 'whip' ? mv.span : mv.span;
+    const from = this.side * (span * 0.5 + (mv.bias ?? 0) + (span < 6 ? 0.15 : 0));
+    return [from, from - this.side * span];
   }
   /** where the blade ends up after the swing */
   private endRel(): number {
     const [from, to] = this.path();
-    return this.motion === 'double' ? from : to;
+    return this.move.m === 'double' ? from : to;
   }
 
   /** rest pose for a body facing right, given the aim folded into the right half */
@@ -1078,47 +1237,33 @@ export class SwordCtl {
       case 'dagger': {
         let spin = 0;
         if (this.twirl >= 0) spin = ease.outCubic(this.twirl) * TAU * 2 * spinDir;
-        // reverse grip at the side, blade pointing back and down
         return { ang: 2.35 + t + spin, hand: 1.55 + t * 0.5, dist: 8 };
       }
       case 'longsword':
-        // held low in front, point raised
         return { ang: -0.95 + t + Math.sin(time * 2) * 0.04, hand: 1.25 + t * 0.5, dist: 8 };
       case 'rapier':
-        // en garde: the point follows the aim
         return { ang: t + Math.sin(time * 3.1) * 0.12, hand: 0.75 + t * 0.6, dist: 9 + Math.sin(time * 3.1 + 1) * 0.7 };
       case 'katana':
-        // saya at the hip, handle forward, tip trailing back and down
         return { ang: Math.PI - 0.55 + t, hand: 1.75 + t * 0.3, dist: 6 };
       case 'greatsword':
-        // resting on the shoulder, blade back over the top
         return { ang: -Math.PI * 0.82 + t + Math.sin(time * 1.6) * 0.03, hand: -1.45 + t * 0.3, dist: 5 };
       case 'scythe':
-        // carried behind, blade up
         return { ang: -Math.PI * 0.6 + t + Math.sin(time * 1.4) * 0.06, hand: 1.9 + t * 0.3, dist: 6 };
       case 'saber':
-        // hanging loose at the side, point down and forward
         return { ang: 0.85 + t + Math.sin(time * 2.2) * 0.05, hand: 1.3 + t * 0.4, dist: 8 };
       case 'cleaver':
-        // propped on the shoulder, edge up
         return { ang: -2.25 + t, hand: -0.9 + t * 0.4, dist: 6 };
       case 'katar':
-        // fist forward, blade along the aim, a little guard bob
         return { ang: 0.12 + t, hand: 0.85 + t * 0.6, dist: 7 + Math.sin(time * 4) * 0.6 };
       case 'spear':
-        // upright beside the body, point up and a little forward
         return { ang: -1.2 + t, hand: 1.35 + t * 0.3, dist: 7 };
       case 'nodachi':
-        // across the back: handle over the shoulder, tip down behind
         return { ang: 2.3 + t, hand: -2.15 + t * 0.3, dist: 4 };
       case 'twinblade':
-        // held in front, idling in a slow spin
         return { ang: time * 1.6 * spinDir, hand: 0.9, dist: 8 };
       case 'whip':
-        // a segmented sword held low
         return { ang: 0.7 + t + Math.sin(time * 2) * 0.05, hand: 1.3 + t * 0.4, dist: 8 };
       case 'plasma':
-        // hilt clipped at the belt, emitter pointing back
         return { ang: 2.0 + t, hand: 1.6 + t * 0.3, dist: 7 };
     }
   }
@@ -1126,7 +1271,6 @@ export class SwordCtl {
   restPose(time: number): { ang: number; hand: number; dist: number } {
     const a = this.restAim;
     const right = this.restRight(a, time, 1);
-    // mirror across the vertical axis: angle -> PI - angle
     const l = this.restRight(Math.PI - a, time, -1);
     const left = { ang: Math.PI - l.ang, hand: Math.PI - l.hand, dist: l.dist };
     const u = ease.inOutCubic((this.faceK + 1) / 2);
@@ -1143,7 +1287,6 @@ export class SwordCtl {
     this.sinceFlip += dt;
     this.sinceAttack += dt;
     const c = Math.cos(wantAim);
-    // don't flip-flop around straight up / down: need a clear lean and a short pause between flips
     if (!this.busy && this.sinceFlip > 0.25 && ((this.facing > 0 && c < -0.3) || (this.facing < 0 && c > 0.3))) {
       this.facing = -this.facing;
       this.sinceFlip = 0;
@@ -1155,9 +1298,9 @@ export class SwordCtl {
       this.parryAge += dt;
     }
     this.squash = Math.max(0, this.squash - dt * 3);
+    this.hop = Math.max(0, this.hop - dt * 4);
     this.lunge *= Math.exp(-dt * 10);
 
-    // idle dagger twirl
     if (this.def.kind === 'dagger' && this.state === 'rest') {
       if (this.twirl >= 0) {
         this.twirl += dt / 0.5;
@@ -1171,17 +1314,19 @@ export class SwordCtl {
 
     const def = this.def;
     const k = def.kind;
-    const mo = this.motion;
+    const mv = this.move;
+    const mo = mv.m;
     const rest = this.restPose(time);
     const [from, to] = this.path();
     const end = this.endRel();
     let dist = rest.dist;
     let absAng = rest.ang, absHand = rest.hand;
     this.t += dt;
-    const reach = this.reach();
+    const reach = this.reach() * (mv.reach ?? 1);
     const stabbing = mo === 'thrust' || mo === 'jabs';
     const thrustDist = 9 + reach * (k === 'spear' ? 0.25 : 0.35);
-    const swingDist = k === 'scythe' ? 4 : k === 'nodachi' ? 7 : 9;
+    const rIn = mv.rIn ?? (k === 'scythe' ? 4 : 8), rOut = mv.rOut ?? 9;
+    const spinning = mv.span >= 6;
 
     const advance = (next: SState, dur: number) => {
       if (this.t >= dur) {
@@ -1195,14 +1340,15 @@ export class SwordCtl {
     switch (this.state) {
       case 'rest':
         this.ext = Math.max(0, this.ext - dt * 6);
+        this.bodyRot += angDiff(this.bodyRot, 0) * Math.min(1, dt * 14);
         break;
       case 'windup': {
-        const u = ease.outCubic(clamp(this.t / def.windup, 0, 1));
+        const W = this.dur('w');
+        const u = ease.outCubic(clamp(this.t / W, 0, 1));
         if (mo === 'thrust') {
-          // the spear twirls a full turn on its way to the guard; the rapier just draws back
-          absAng = k === 'spear' ? rest.ang + (angDiff(rest.ang, this.aim) + this.side * TAU) * u : this.aim;
-          absHand = lerpAng(rest.hand, this.aim + 0.2, u);
-          dist = lerp(rest.dist, 4, u);
+          absAng = mv.twirlIn ? rest.ang + (angDiff(rest.ang, this.aim) + this.side * TAU) * u : lerpAng(rest.ang, this.aim, u);
+          absHand = lerpAng(rest.hand, this.aim + 0.2 * this.side, u);
+          dist = lerp(rest.dist, 3.5, u);
         } else if (mo === 'jabs') {
           absAng = lerpAng(rest.ang, this.aim, u);
           absHand = lerpAng(rest.hand, this.aim + 0.3, u);
@@ -1212,31 +1358,33 @@ export class SwordCtl {
           absHand = lerpAng(rest.hand, this.aim, u);
           dist = lerp(rest.dist, 9, u);
         } else {
-          const cockBy = k === 'greatsword' ? 0.6 : k === 'cleaver' ? 0.9 : k === 'nodachi' ? 0.5 : 0.3;
-          const cock = from + this.side * cockBy;
+          // pull back past the start of the cut: the coil before the release
+          const cock = from + this.side * (mv.cock ?? (HEAVY[k] ? 0.6 : 0.35));
           absAng = lerpAng(rest.ang, this.aim + cock, u);
-          absHand = lerpAng(rest.hand, this.aim + cock * 0.6, u);
-          dist = lerp(rest.dist, swingDist - 1, u);
+          absHand = lerpAng(rest.hand, this.aim + cock * (spinning ? 1 : 0.6), u);
+          dist = lerp(rest.dist, rIn, u);
         }
-        if (k === 'plasma') this.ext = u;
-        if (advance('swing', def.windup)) {
+        if (k === 'plasma') this.ext = Math.max(this.ext, u);
+        if (advance('swing', W)) {
           sfx.swing(k);
+          if (mv.fin) sfx.play(['swing_h1', 'swing_h2'], { vol: 0.35, rate: 1.2 });
           this.prevRel = stabbing ? 0 : from;
-          this.lunge = k === 'spear' ? 1.3 : k === 'rapier' ? 1 : mo === 'jabs' ? 0.5 : HEAVY[k] ? 0.6 : 0.35;
+          this.lunge = mv.lunge ?? (k === 'spear' ? 1.3 : k === 'rapier' ? 1 : mo === 'jabs' ? 0.5 : HEAVY[k] ? 0.6 : 0.35);
+          if (mv.hop === 1) this.hop = 1;
           if (mo === 'whip') this.resetChain();
         }
         break;
       }
       case 'swing': {
-        const u = clamp(this.t / def.swing, 0, 1);
+        const SW = this.dur('s');
+        const u = clamp(this.t / SW, 0, 1);
         if (mo === 'thrust') {
           const e = ease.outExpo(u);
           absAng = this.aim;
-          absHand = this.aim + 0.2 * (1 - e);
-          dist = lerp(4, thrustDist, e);
+          absHand = this.aim + 0.2 * this.side * (1 - e);
+          dist = lerp(3.5, thrustDist, e);
           this.sweepThrust(px, py, reach * (0.4 + 0.6 * e), this.aim);
         } else if (mo === 'jabs') {
-          // three quick punches, each its own hit
           const j = Math.min(2, Math.floor(u * 3));
           if (j !== this.step) {
             this.step = j;
@@ -1251,7 +1399,6 @@ export class SwordCtl {
           dist = 4 + out * reach * 0.45;
           this.sweepThrust(px, py, 6 + out * reach, this.aim + off);
         } else if (mo === 'handspin') {
-          // the staff whirls in the hand; each half turn is a fresh cut
           const pass = Math.min(2, Math.floor(u * 3));
           if (pass !== this.step) {
             this.step = pass;
@@ -1265,7 +1412,6 @@ export class SwordCtl {
         } else {
           let rel: number;
           if (mo === 'double') {
-            // out and straight back: two cuts in one swing
             const back = u >= 0.5;
             const step = back ? 1 : 0;
             if (step !== this.step) {
@@ -1277,57 +1423,74 @@ export class SwordCtl {
               }
             }
             rel = back ? lerp(to, from, ease.outQuart((u - 0.5) * 2)) : lerp(from, to, ease.outQuart(u * 2));
-          } else rel = lerp(from, to, ease.outQuart(u));
-          const handRel = mo === 'double' ? rel * 0.65 : lerp(from * 0.65, to * 0.65, ease.outCubic(u));
+          } else {
+            // fast attack, long follow-through; spins carry an even speed so they read as one motion
+            rel = lerp(from, to, spinning ? ease.inOutSine(u) * 0.35 + ease.outCubic(u) * 0.65 : ease.outQuart(u));
+            // a fresh cut every full turn of a spin
+            if (spinning) {
+              const turn = Math.floor(Math.abs(rel - from) / TAU);
+              if (turn !== this.step) {
+                if (this.step >= 0) {
+                  this.hit.clear();
+                  sfx.swing(k);
+                }
+                this.step = turn;
+              }
+            }
+          }
+          const handRel = mo === 'double' ? rel * 0.65 : spinning ? rel : lerp(from * 0.65, to * 0.65, ease.outCubic(u));
           absAng = this.aim + rel;
           absHand = this.aim + handRel;
-          dist = swingDist;
+          // elliptical hand path: in close at the start, out at the end, bulging mid-cut
+          dist = lerp(rIn, rOut, ease.outCubic(u)) + (mv.bulge ?? 0) * Math.sin(u * Math.PI);
+          if (spinning && mv.body) this.bodyRot = rel - from;
           if (mo === 'whip') this.ext = ease.outCubic(u);
           if (mo !== 'whip') this.sweepArc(px, py, reach, this.prevRel, rel);
           else if (this.parryT > 0) this.run.parryShots(px, py, reach * 0.7, this);
           this.prevRel = rel;
         }
         if (k === 'plasma') this.ext = 1;
-        if (advance('hold', def.swing)) this.onSwingEnd(px, py);
+        if (advance('hold', SW)) this.onSwingEnd(px, py);
         break;
       }
       case 'hold': {
         if (stabbing) {
           absAng = this.aim;
-          absHand = this.aim + 0.2;
+          absHand = this.aim + 0.2 * this.side;
           dist = mo === 'jabs' ? 5 : thrustDist;
         } else if (mo === 'handspin') {
           absAng = this.aim + end;
           absHand = this.aim;
           dist = 9;
         } else {
-          const settle = Math.sin(clamp(this.t / def.hold_, 0, 1) * Math.PI) * 0.1 * this.side;
+          // overshoot and settle back a touch
+          const H = this.dur('h');
+          const settle = Math.sin(clamp(this.t / Math.max(0.001, H), 0, 1) * Math.PI) * 0.12 * this.side;
           absAng = this.aim + end + settle;
-          absHand = this.aim + end * 0.65;
-          dist = swingDist;
+          absHand = this.aim + (spinning ? end : end * 0.65);
+          dist = rOut;
         }
-        advance('recover', def.hold_);
+        advance('recover', this.dur('h'));
         break;
       }
       case 'recover': {
-        const u = clamp(this.t / def.recover, 0, 1);
+        const R = this.dur('r');
+        const u = clamp(this.t / R, 0, 1);
         const e = ease.inOutCubic(u);
+        // a flourish: the blade turns over in the hand on the way back to guard
+        const twirl = ((mv.twirl ?? (k === 'dagger' ? 1 : 0)) * TAU * this.side * -1) * ease.outCubic(u);
         if (stabbing) {
-          absAng = lerpAng(this.aim, rest.ang, e);
-          absHand = lerpAng(this.aim + 0.2, rest.hand, e);
+          absAng = lerpAng(this.aim, rest.ang, e) + twirl;
+          absHand = lerpAng(this.aim + 0.2 * this.side, rest.hand, e);
           dist = lerp(mo === 'jabs' ? 5 : thrustDist, rest.dist, e);
         } else if (mo === 'handspin') {
-          // let the spin run down into the idle twirl
           absAng = lerpAng(this.aim + end + this.side * u * 1.5, rest.ang, e);
           absHand = lerpAng(this.aim, rest.hand, e);
           dist = lerp(9, rest.dist, e);
         } else {
-          let extra = 0;
-          // dagger flicks a twirl on the way back, the long blades slide home into the saya
-          if (k === 'dagger') extra = ease.outCubic(u) * TAU * this.side;
-          absAng = lerpAng(this.aim + end, rest.ang, e) + extra;
-          absHand = lerpAng(this.aim + end * 0.65, rest.hand, e);
-          dist = lerp(swingDist, rest.dist, e);
+          absAng = lerpAng(this.aim + end, rest.ang, e) + twirl;
+          absHand = lerpAng(this.aim + (spinning ? end : end * 0.65), rest.hand, e);
+          dist = lerp(rOut, rest.dist, e);
           if (SAYA[k] && u > 0.92 && !this.sheathClick) {
             this.sheathClick = true;
             sfx.sheathe();
@@ -1335,9 +1498,36 @@ export class SwordCtl {
             this.run.fx.flare(sx, sy, 3, 0xfff0c0, 0.06);
           }
         }
+        this.bodyRot += angDiff(this.bodyRot, 0) * Math.min(1, dt * 16);
         if (k === 'plasma') this.ext = 1 - seg(u, 0.25, 0.8);
         if (mo === 'whip') this.ext = 1 - ease.inOutCubic(seg(u, 0, 0.7));
-        if (advance('rest', def.recover)) this.t = 0;
+        if (advance('rest', R)) this.t = 0;
+        break;
+      }
+      case 'deflect': {
+        // 0-50ms: snap crossways onto the blow; then the recoil; then a twirl back to guard
+        const T = this.t, D = this.defDur;
+        const snap = ease.outExpo(clamp(T / 0.05, 0, 1));
+        const toward = this.defAng;
+        if (T < 0.14) {
+          absAng = lerpAng(this.defFrom, this.defGuard, snap);
+          absHand = toward;
+          const recoil = Math.sin(clamp((T - 0.04) / 0.1, 0, 1) * Math.PI);
+          dist = 8 - recoil * 3.5;
+        } else {
+          const f = clamp((T - 0.14) / (D - 0.14), 0, 1);
+          const spin = ease.outCubic(f) * TAU * (this.defPerfect ? 2 : 1) * this.defSpin;
+          const back = ease.inOutCubic(seg(f, 0.45, 1));
+          absAng = lerpAng(this.defGuard + spin, rest.ang, back);
+          absHand = lerpAng(toward, rest.hand, back);
+          dist = lerp(8, rest.dist, back);
+        }
+        this.bodyRot += angDiff(this.bodyRot, 0) * Math.min(1, dt * 16);
+        if (k === 'plasma') this.ext = 1 - seg(T / D, 0.7, 1);
+        if (T >= D) {
+          this.state = 'rest';
+          this.t = 0;
+        }
         break;
       }
     }
@@ -1345,18 +1535,21 @@ export class SwordCtl {
     this.ang = absAng;
     this.hx = px + Math.cos(absHand) * dist;
     this.hy = py + Math.sin(absHand) * dist;
-    if (mo === 'whip') this.updateChain(dt);
-    if (mo === 'whip' && (this.state === 'swing' || (this.state === 'hold' && this.t < 0.04))) this.sweepChain(px, py);
+    if (mo === 'whip' && this.state !== 'deflect') this.updateChain(dt);
+    if (mo === 'whip' && (this.state === 'swing' || (this.state === 'hold' && this.t < 0.04))) this.sweepChain(px, py, mv.dmg ?? 1);
 
-    // trail samples while the blade is moving fast
     for (const tr of [this.trail, this.trail2]) {
       for (const p of tr) p.age += dt;
       while (tr.length && tr[0].age > 0.11) tr.shift();
     }
-    const moving = this.state === 'swing' || (this.state === 'hold' && this.t < 0.03) || (k === 'dagger' && this.state === 'recover' && this.t < def.recover * 0.6);
+    const moving =
+      this.state === 'swing' ||
+      (this.state === 'hold' && this.t < 0.03) ||
+      (this.state === 'recover' && this.t < this.dur('r') * 0.6 && ((mv.twirl ?? 0) > 0 || k === 'dagger')) ||
+      (this.state === 'deflect' && this.t > 0.14 && this.t < this.defDur * 0.8);
     if (moving) {
       const ca = Math.cos(this.ang), sa = Math.sin(this.ang);
-      if (mo === 'whip' && this.chain.length) {
+      if (mo === 'whip' && this.chain.length && this.state !== 'deflect') {
         const tip = this.chain[WHIP_N - 1], mid = this.chain[WHIP_N - 4];
         this.trail.push({ tx: tip.x, ty: tip.y, mx: mid.x, my: mid.y, age: 0 });
       } else {
@@ -1381,12 +1574,10 @@ export class SwordCtl {
     let prevX = this.hx, prevY = this.hy;
     for (let i = 0; i < WHIP_N; i++) {
       const p = this.chain[i];
-      // each link chases the straight blade line; outer links lag so the blade curls like a whip
       const tx = this.hx + ca * seg * (i + 1), ty = this.hy + sa * seg * (i + 1);
       const k = Math.min(1, dt * (70 / (1 + i * 0.55)));
       p.x += (tx - p.x) * k;
       p.y += (ty - p.y) * k;
-      // keep the links joined
       const dx = p.x - prevX, dy = p.y - prevY, d = Math.hypot(dx, dy) || 1;
       p.x = prevX + (dx / d) * seg;
       p.y = prevY + (dy / d) * seg;
@@ -1394,14 +1585,14 @@ export class SwordCtl {
       prevY = p.y;
     }
   }
-  private sweepChain(px: number, py: number) {
+  private sweepChain(px: number, py: number, mul: number) {
     for (const e of this.run.enemies) {
       if (e.dead || this.hit.has(e)) continue;
       let px0 = this.hx, py0 = this.hy;
       for (const p of this.chain) {
         if (segDist(e.x, e.y, px0, py0, p.x, p.y) < e.r + 2.5) {
           const dx = e.x - px, dy = e.y - py, d = Math.hypot(dx, dy) || 1;
-          this.strike(e, dx / d, dy / d);
+          this.strike(e, dx / d, dy / d, mul);
           break;
         }
         px0 = p.x;
@@ -1414,7 +1605,8 @@ export class SwordCtl {
     const def = this.def;
     const fx = this.run.fx;
     const k = def.kind;
-    if (k === 'greatsword' || k === 'cleaver') {
+    const mv = this.move;
+    if ((k === 'greatsword' || k === 'cleaver') && mv.dir === 'down' && mv.span < 6) {
       const a = this.aim + this.endRel();
       const r = this.reach() * 0.85;
       const x = px + Math.cos(a) * r, y = py + Math.sin(a) * r;
@@ -1425,12 +1617,17 @@ export class SwordCtl {
       if (k === 'greatsword') sfx.slam();
       else sfx.foley('slam2', 0.5, 1.3);
     }
-    if (k === 'katana' || k === 'nodachi' || k === 'plasma') {
-      // the cut lingers as a thin crescent
+    if ((k === 'katana' || k === 'nodachi' || k === 'plasma') && mv.span < 6) {
       const [from, to] = this.path();
       fx.crescent(px, py, this.reach() * 0.8, this.aim + from, this.aim + to, k === 'nodachi' ? 4 : 3, k === 'plasma' ? def.color : 0xbfe4ff, 0.28);
     }
-    if (k === 'scythe') fx.ring(px, py, this.reach() * 0.5, this.reach() * 1.05, 0.25, 0xc49bff, 2);
+    // spinning finishers leave a ring of wind behind
+    if (mv.span >= 6 && mv.m !== 'whip') fx.ring(px, py, this.reach() * 0.5, this.reach() * (mv.reach ?? 1) * 1.05, 0.28, def.color, 2);
+    if (mv.fin && mv.m === 'thrust') {
+      const x = px + Math.cos(this.aim) * this.reach() * (mv.reach ?? 1), y = py + Math.sin(this.aim) * this.reach() * (mv.reach ?? 1);
+      fx.ring(x, y, 1, 10, 0.18, 0xffffff, 1.5);
+      fx.sparks(x, y, this.aim, 0.4, 5, 160, def.color, 0xffffff, 0.18);
+    }
   }
 
   sheathMouth(px: number, py: number): [number, number] {
@@ -1441,6 +1638,7 @@ export class SwordCtl {
 
   private sweepArc(px: number, py: number, reach: number, r0: number, r1: number) {
     const lo = Math.min(r0, r1) - 0.22, hi = Math.max(r0, r1) + 0.22;
+    const mul = this.move.dmg ?? 1;
     for (const e of this.run.enemies) {
       if (e.dead || this.hit.has(e)) continue;
       const dx = e.x - px, dy = e.y - py;
@@ -1448,54 +1646,55 @@ export class SwordCtl {
       if (d - e.r > reach) continue;
       const rel = angDiff(this.aim, Math.atan2(dy, dx));
       let inside = false;
-      for (const off of [0, TAU, -TAU, 2 * TAU, -2 * TAU]) if (rel + off >= lo && rel + off <= hi) inside = true;
-      if (d < e.r + 6) inside = true; // hugging: always connects
-      if (inside) this.strike(e, dx / (d || 1), dy / (d || 1));
+      for (let off = -3; off <= 3; off++) if (rel + off * TAU >= lo && rel + off * TAU <= hi) inside = true;
+      if (d < e.r + 6) inside = true;
+      if (inside) this.strike(e, dx / (d || 1), dy / (d || 1), mul);
     }
-    // blade sweeps enemy bullets during the parry window
     if (this.parryT > 0) this.run.parryShots(px, py, reach + 4, this);
   }
 
   private sweepThrust(px: number, py: number, len: number, a: number) {
     const ca = Math.cos(a), sa = Math.sin(a);
     const ex = px + ca * len, ey = py + sa * len;
+    const mul = this.move.dmg ?? 1;
     for (const e of this.run.enemies) {
       if (e.dead || this.hit.has(e)) continue;
-      if (segDist(e.x, e.y, px, py, ex, ey) < e.r + 4) this.strike(e, ca, sa);
+      if (segDist(e.x, e.y, px, py, ex, ey) < e.r + 4) this.strike(e, ca, sa, mul);
     }
     if (this.parryT > 0) this.run.parryShots(px, py, len + 6, this);
   }
 
-  /** everything within reach of a point (the spinning staff in front of the body) */
   private sweepAround(cx: number, cy: number, reach: number, px: number, py: number) {
+    const mul = this.move.dmg ?? 1;
     for (const e of this.run.enemies) {
       if (e.dead || this.hit.has(e)) continue;
       const dx = e.x - cx, dy = e.y - cy, d = Math.hypot(dx, dy);
       if (d - e.r > reach) continue;
       const ox = e.x - px, oy = e.y - py, od = Math.hypot(ox, oy) || 1;
-      this.strike(e, ox / od, oy / od);
+      this.strike(e, ox / od, oy / od, mul);
     }
     if (this.parryT > 0) this.run.parryShots(px, py, reach + 12, this);
   }
 
-  private strike(e: Enemy, nx: number, ny: number) {
+  private strike(e: Enemy, nx: number, ny: number, mul = 1) {
     this.hit.add(e);
     const def = this.def;
     const k = def.kind;
+    const fin = !!this.move.fin;
     const critP = k === 'rapier' || k === 'cleaver' ? 0.3 : k === 'katar' ? 0.15 : 0.1;
-    const crit = Math.random() < critP;
-    const dmg = this.dmg() * (crit ? 1.8 : 1) * (e.stun > 0 ? 1.5 : 1);
-    this.run.damageEnemy(e, dmg, nx * def.knock, ny * def.knock, crit, 'sword');
+    const crit = Math.random() < critP + (fin ? 0.15 : 0);
+    const dmg = this.dmg() * mul * (crit ? 1.8 : 1) * (e.stun > 0 ? 1.5 : 1);
+    this.run.damageEnemy(e, dmg, nx * def.knock * (fin ? 1.4 : 1), ny * def.knock * (fin ? 1.4 : 1), crit, 'sword');
     const fx = this.run.fx;
     const hx = e.x - nx * e.r, hy = e.y - ny * e.r;
-    const heavy = !!HEAVY[k];
+    const heavy = !!HEAVY[k] || fin;
     fx.flare(hx, hy, heavy ? 8 : 5, def.color, 0.07);
     fx.sparks(hx, hy, Math.atan2(ny, nx), 0.7, heavy ? 10 : 5, 170, k === 'plasma' ? def.color : 0xffffff, 0xffffff, 0.22);
     fx.light(hx, hy, 24, def.color, 0.6, 0.1);
     sfx.slashHit(heavy);
     if (!this.hitStopDone) {
       this.hitStopDone = true;
-      this.run.hitstop(def.stop);
+      this.run.hitstop(def.stop * (fin ? 1.5 : 1));
       this.run.shake(heavy ? 5 : 2.5);
     } else this.run.hitstop(0.008);
   }
@@ -1510,7 +1709,6 @@ export class SwordCtl {
       const alpha = 0.15 + k * 0.6;
       g.tri(a.mx, a.my, a.tx, a.ty, b.tx, b.ty, c, alpha, true);
       g.tri(a.mx, a.my, b.tx, b.ty, b.mx, b.my, c, alpha, true);
-      // crisp leading edge along the tip path
       g.line(a.tx, a.ty, b.tx, b.ty, k > 0.5 ? 0xffffff : c, Math.min(1, k * 1.6));
       g.glowLine(a.tx, a.ty, b.tx, b.ty, 5, c0, 0.14 * k);
     }
@@ -1521,33 +1719,32 @@ export class SwordCtl {
     const k = def.kind;
     this.drawTrail(g, this.trail);
     if (this.trail2.length) this.drawTrail(g, this.trail2);
-    const fy = this.state === 'rest' ? (this.faceK >= 0 ? 1 : -1) : -this.side;
+    const fy = this.state === 'rest' ? (this.faceK >= 0 ? 1 : -1) : this.state === 'deflect' ? this.defSpin : -this.side;
     this.artFy = fy;
-    // scabbarded blades: the saya stays put even when the blade is out
     const saya = SAYA[k];
     if (saya) {
       const rest = this.restPose(time);
       const sx = this.hx0 + Math.cos(rest.hand) * rest.dist, sy = this.hy0 + Math.sin(rest.hand) * rest.dist;
-      const S = new Xf(g, sx, sy, rest.ang, this.faceK >= 0 ? 1 : -1);
+      const Sx = new Xf(g, sx, sy, rest.ang, this.faceK >= 0 ? 1 : -1);
       if (this.state === 'rest') {
-        drawSword(S, k, def.color, time, true);
-        if (showHand) hand(S, GRIP[k], 0, handC);
+        drawSword(Sx, k, def.color, time, true);
+        if (showHand) hand(Sx, GRIP[k], 0, handC);
         return;
       }
-      // empty saya
-      S.q(1, -1.6, saya, 3.2, 0x3a1020);
-      S.q(1, -1.6, saya, 1, 0x7a2438);
-      S.q(saya, -1.6, 1.5, 3.2, 0xe0b24a);
+      Sx.q(1, -1.6, saya, 3.2, 0x3a1020);
+      Sx.q(1, -1.6, saya, 1, 0x7a2438);
+      Sx.q(saya, -1.6, 1.5, 3.2, 0xe0b24a);
     }
     const X = new Xf(g, this.hx, this.hy, this.ang, fy);
-    const extended = this.motion === 'whip' && this.ext > 0.05 && this.chain.length === WHIP_N;
+    const extended = this.move.m === 'whip' && this.ext > 0.05 && this.chain.length === WHIP_N && this.state !== 'deflect';
     drawSword(X, k, def.color, time, false, extended ? 0 : this.ext, extended);
     if (extended) this.drawChain(g);
     if (showHand) hand(X, GRIP[k], 0, handC);
-    if (this.parryT > 0 && this.perfect()) {
+    // a cold glint along the edge while guarding or in the perfect window
+    if ((this.parryT > 0 && this.perfect()) || (this.state === 'deflect' && this.t < 0.14)) {
       const L = BLADE_LEN[k];
       const [tx, ty] = X.pt(L * 0.7, 0);
-      g.glow(tx, ty, 10, 0xffffff, 0.25);
+      g.glow(tx, ty, 10, 0xffffff, this.state === 'deflect' ? 0.4 : 0.25);
     }
   }
 
@@ -1560,7 +1757,6 @@ export class SwordCtl {
       const a = Math.atan2(p.y - y0, p.x - x0);
       const len = Math.hypot(p.x - x0, p.y - y0);
       const w = 3.4 - i * 0.14;
-      // a blade plate with a bright edge, and a thin wire to the next plate
       g.line(x0, y0, p.x, p.y, 0x8a9aa0);
       g.quad(x0, y0, a, len * 0.1, -w / 2, len * 0.85, w, lo);
       g.quad(x0, y0, a, len * 0.1, -w / 2, len * 0.85, w * 0.45, c);
