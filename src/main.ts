@@ -8,6 +8,7 @@ import { Run, type Loadout, type RunResult } from './game/run';
 import { drawHud, type Banner } from './ui/hud';
 import { UI, tickPreviews } from './ui/ui';
 import { openFromBlack, slash, wiping } from './ui/transition';
+import { enterFullscreen, onFullscreenChange } from './ui/fullscreen';
 
 const H = 200;
 const HUD_H = 270;
@@ -200,6 +201,23 @@ const unlock = () => sfx.init();
 addEventListener('pointerdown', unlock);
 addEventListener('keydown', unlock);
 addEventListener('touchstart', unlock);
+
+// any click (or key) in the game goes fullscreen, unless turned off in settings
+const goFull = (e: Event) => {
+  if (!save.fullscreen) return;
+  if (e instanceof KeyboardEvent && (e.code === 'Escape' || e.repeat)) return;
+  enterFullscreen();
+};
+addEventListener('pointerup', goFull);
+addEventListener('touchend', goFull);
+addEventListener('keydown', goFull);
+// leaving fullscreen mid-run (Esc, swipe) pauses so nothing is lost
+onFullscreenChange((on) => {
+  if (!on && mode === 'play' && !paused && !run.over && !run.choosing) {
+    paused = true;
+    ui.pause();
+  }
+});
 sfx.setEnabled(save.sound);
 sfx.setMusic(save.music);
 sfx.music('lobby');

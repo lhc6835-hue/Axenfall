@@ -19,6 +19,7 @@ export interface Save {
   runs: number;
   sound: boolean;
   music: boolean;
+  fullscreen: boolean;
 }
 
 const KEY = 'parrycube_save_v1';
@@ -37,6 +38,7 @@ function fresh(): Save {
     runs: 0,
     sound: true,
     music: true,
+    fullscreen: true,
   };
   restock(s);
   return s;

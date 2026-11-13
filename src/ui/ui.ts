@@ -7,6 +7,7 @@ import {
 } from '../game/data';
 import { buy, catalog, checkTimedRestock, persist, priceOf, purchasable, rerollCost, reroll, resetSave, save, type ShopCat, type Slot } from '../game/save';
 import type { RunResult } from '../game/run';
+import { canFullscreen, enterFullscreen, exitFullscreen } from './fullscreen';
 
 export interface AppApi {
   startRun(): void;
@@ -182,6 +183,7 @@ export class UI {
       <h2>설정</h2>
       <button class="btn" data-a="snd">효과음: ${save.sound ? '켜짐' : '꺼짐'}</button>
       <button class="btn" data-a="bgm">배경음: ${save.music ? '켜짐' : '꺼짐'}</button>
+      ${canFullscreen() ? `<button class="btn" data-a="fs">전체화면: ${save.fullscreen ? '자동' : '끔'}</button>` : ''}
       <button class="btn ghost danger" data-a="reset">저장 데이터 초기화</button>
       <button class="btn" data-a="close">닫기</button>
       <p class="credits">음악 Komiku (CC0) · 총기 녹음 Free Firearm Sound Library (CC0) · 효과음 Kenney (CC0), Beatscribe (CC0),
@@ -199,6 +201,15 @@ export class UI {
       persist();
       (e.target as HTMLElement).textContent = `배경음: ${save.music ? '켜짐' : '꺼짐'}`;
     };
+    const fsBtn = m.querySelector<HTMLElement>('[data-a=fs]');
+    if (fsBtn)
+      fsBtn.onclick = (e) => {
+        save.fullscreen = !save.fullscreen;
+        persist();
+        if (save.fullscreen) enterFullscreen();
+        else exitFullscreen();
+        (e.target as HTMLElement).textContent = `전체화면: ${save.fullscreen ? '자동' : '끔'}`;
+      };
     m.querySelector<HTMLElement>('[data-a=reset]')!.onclick = () => {
       if (confirm('골드, 무기, 스킨이 모두 사라져요. 정말 초기화할까요?')) {
         resetSave();
@@ -422,6 +433,7 @@ export class UI {
       <button class="btn primary" data-a="resume">계속하기</button>
       <button class="btn" data-a="snd">효과음: ${save.sound ? '켜짐' : '꺼짐'}</button>
       <button class="btn" data-a="bgm">배경음: ${save.music ? '켜짐' : '꺼짐'}</button>
+      ${canFullscreen() ? `<button class="btn" data-a="fs">전체화면: ${save.fullscreen ? '자동' : '끔'}</button>` : ''}
       <button class="btn ghost danger" data-a="quit">포기하고 로비로 (모은 골드는 받아요)</button>
     </div>`;
     m.querySelector<HTMLElement>('[data-a=resume]')!.onclick = () => this.app.resume();
@@ -437,6 +449,15 @@ export class UI {
       persist();
       (e.target as HTMLElement).textContent = `배경음: ${save.music ? '켜짐' : '꺼짐'}`;
     };
+    const fsBtn = m.querySelector<HTMLElement>('[data-a=fs]');
+    if (fsBtn)
+      fsBtn.onclick = (e) => {
+        save.fullscreen = !save.fullscreen;
+        persist();
+        if (save.fullscreen) enterFullscreen();
+        else exitFullscreen();
+        (e.target as HTMLElement).textContent = `전체화면: ${save.fullscreen ? '자동' : '끔'}`;
+      };
     m.querySelector<HTMLElement>('[data-a=quit]')!.onclick = () => this.app.quitRun();
     root().appendChild(m);
   }
