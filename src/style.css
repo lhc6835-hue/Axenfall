@@ -30,9 +30,52 @@ button { font-family: inherit; cursor: pointer; }
 .gold { display: inline-flex; align-items: center; gap: 6px; background: rgba(0,0,0,.45); border: 1px solid #4a3a20; padding: 5px 12px; border-radius: 4px; color: #ffe08a; font-family: 'Galmuri11B', monospace; font-size: 15px; }
 .coin { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff2b0, #ffc23a 45%, #b07a1c); box-shadow: 0 0 6px #ffc23a88; vertical-align: middle; margin-right: 3px; }
 .title { text-align: center; margin-top: 2vh; }
-.title h1 { margin: 0; font-family: 'Galmuri14', monospace; font-size: clamp(26px, min(7vw, 9vh), 64px); letter-spacing: 4px; color: #fff; text-shadow: 0 4px 0 #3a2a6a, 0 0 24px #7a5aff88; }
-.title h1 span { color: var(--accent); margin-left: 12px; text-shadow: 0 4px 0 #6a4a10, 0 0 24px #ffd04a88; }
-.title p { margin: 6px 0 0; color: var(--dim); font-size: 14px; }
+/* ---------- logo ---------- */
+.logo { display: flex; flex-direction: column; align-items: center; }
+.logo-parry {
+  position: relative; margin: 0; font-family: 'Galmuri11B', monospace; font-weight: normal;
+  font-size: clamp(40px, min(11vw, 14vh), 104px); line-height: 1; letter-spacing: .06em; padding-left: .06em;
+  color: #f2f0ff;
+}
+.logo-parry .half { display: block; }
+.logo-parry .half.top {
+  clip-path: polygon(0 0, 100% 0, 100% 39%, 0 74%);
+  text-shadow: .06em .06em 0 #3a2d78, 0 0 .3em rgba(122, 96, 255, .18);
+}
+/* the lower half has been cut off and slid along the blade */
+.logo-parry .half.bot {
+  position: absolute; inset: 0; color: #d6d0f2;
+  clip-path: polygon(0 74%, 100% 39%, 100% 100%, 0 100%);
+  text-shadow: .06em .06em 0 #2a2060;
+  transform: translate(.11em, .02em);
+  animation: slice-off .55s .35s cubic-bezier(.2, 1.4, .4, 1) both;
+}
+.logo-parry .cut { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.logo-parry .cut line {
+  stroke-width: 2px; stroke-dasharray: 130; stroke-dashoffset: 130;
+  animation: cut-draw .3s .15s cubic-bezier(.6, 0, .2, 1) forwards, cut-fade 1.6s .45s ease-out forwards;
+}
+@keyframes cut-draw { to { stroke-dashoffset: 0; } }
+@keyframes cut-fade { to { opacity: .22; } }
+@keyframes slice-off { from { transform: translate(0, 0); } }
+.logo-cube { display: flex; gap: .2em; margin-top: .42em; font-family: 'Galmuri11B', monospace; font-size: clamp(20px, min(4.6vw, 6vh), 44px); }
+.logo-cube b {
+  width: 1.2em; height: 1.2em; display: grid; place-items: center; font-weight: normal; color: #ffd23a;
+  background: #17122a; border: .09em solid #ffd23a;
+  box-shadow: inset .08em .08em 0 #3a2e5a, inset -.08em -.08em 0 #0b0816, 0 .12em 0 #6a4a10, 0 .2em 0 #2a1c06;
+  text-shadow: 0 .07em 0 #6a4a10;
+  animation: cube-in .4s cubic-bezier(.2, 1.5, .4, 1) both, cube-bob 3.6s ease-in-out infinite;
+}
+.logo-cube b:nth-child(1) { animation-delay: .55s, 1.2s; }
+.logo-cube b:nth-child(2) { animation-delay: .62s, 2.1s; }
+.logo-cube b:nth-child(3) { animation-delay: .69s, 3s; }
+.logo-cube b:nth-child(4) { animation-delay: .76s, 3.9s; }
+@keyframes cube-in { from { transform: translateY(-.5em) rotate(-25deg); opacity: 0; } }
+@keyframes cube-bob { 0%, 82%, 100% { transform: none; } 88% { transform: translateY(-.14em) rotate(-6deg); } 94% { transform: translateY(0) rotate(3deg); } }
+.logo-sub { display: flex; align-items: center; gap: .8em; margin: .9em 0 0; color: var(--dim); font-size: 13px; letter-spacing: .35em; padding-left: .35em; }
+.logo-sub i { display: block; width: 3.2em; height: 1px; background: linear-gradient(90deg, transparent, #8a80b8); }
+.logo-sub i:last-child { transform: scaleX(-1); }
+@media (prefers-reduced-motion: reduce) { .logo-parry .half.bot, .logo-parry .cut line, .logo-cube b { animation: none; } .logo-parry .cut line { stroke-dashoffset: 0; opacity: .22; } }
 .eqline { margin-top: auto; display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
 .tag { font-size: 12px; padding: 3px 8px; border: 1px solid var(--line); background: rgba(0,0,0,.5); border-radius: 3px; }
 .tag.gun { color: var(--gun); }
@@ -46,7 +89,8 @@ button { font-family: inherit; cursor: pointer; }
 @media (max-height: 500px) {
   .lobby { padding: 8px 16px; }
   .title { margin-top: 0; }
-  .title p { font-size: 12px; margin-top: 2px; }
+  .logo-sub { font-size: 11px; margin-top: .5em; }
+  .logo-cube { margin-top: .3em; }
   .menu { margin-top: 6px; gap: 6px; }
   .btn { padding: 7px 16px; font-size: 14px; }
   .best { margin-top: 4px; font-size: 11px; }
@@ -68,7 +112,7 @@ button { font-family: inherit; cursor: pointer; }
 
 /* ---------- panel (shop / loadout) ---------- */
 .panel-wrap { position: absolute; inset: 0; display: flex; justify-content: flex-end; pointer-events: none !important; }
-.panel { pointer-events: auto; width: min(620px, 60vw); height: 100%; background: var(--panel); border-left: 2px solid var(--line); padding: 12px 14px; overflow-y: auto; box-shadow: -10px 0 30px #0008; }
+.panel { animation: panel-in .32s cubic-bezier(.2, .8, .2, 1) both; pointer-events: auto; width: min(620px, 60vw); height: 100%; background: var(--panel); border-left: 2px solid var(--line); padding: 12px 14px; overflow-y: auto; box-shadow: -10px 0 30px #0008; }
 @media (max-width: 720px) { .panel { width: 100vw; border-left: 0; } }
 .phead { display: flex; align-items: center; gap: 10px; }
 .phead h2 { margin: 0; flex: 1; font-family: 'Galmuri14', monospace; font-size: 22px; }
@@ -171,3 +215,16 @@ button { font-family: inherit; cursor: pointer; }
 @media (orientation: portrait) and (pointer: coarse) { #rotate { display: flex; } }
 
 .credits { font-size: 10px; color: #6a6090; line-height: 1.6; margin: 6px 0 0; max-width: 320px; }
+
+@keyframes panel-in { from { transform: translateX(32px); opacity: 0; } }
+
+/* ---------- slash transition ---------- */
+#wipe { position: fixed; inset: 0; z-index: 40; pointer-events: none; }
+#wipe.on { pointer-events: auto; }
+#wipe .wp { position: absolute; inset: -2px; background: #0d0a18; will-change: transform; }
+#wipe .wp::after { content: ''; position: absolute; inset: 0; opacity: .5;
+  background: repeating-linear-gradient(-22deg, transparent 0 14px, rgba(255,255,255,.018) 14px 16px); }
+#wipe .wp.a { clip-path: polygon(0 0, 100% 0, 100% 36%, 0 64%); }
+#wipe .wp.b { clip-path: polygon(0 64%, 100% 36%, 100% 100%, 0 100%); }
+#wipe svg { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; }
+#wipe svg line { stroke: #d8d2ff; stroke-width: 1.5px; }

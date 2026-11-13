@@ -7,6 +7,7 @@ import { persist, restock, save } from './game/save';
 import { Run, type Loadout, type RunResult } from './game/run';
 import { drawHud, type Banner } from './ui/hud';
 import { UI, tickPreviews } from './ui/ui';
+import { openFromBlack, slash, wiping } from './ui/transition';
 
 const H = 200;
 const HUD_H = 270;
@@ -103,6 +104,12 @@ const ui = new UI({
 });
 
 function startRun() {
+  if (wiping() || mode === 'play') return;
+  // the lobby is cut away and the arena slides in
+  slash(beginRun);
+}
+
+function beginRun() {
   previewOv = null;
   mode = 'play';
   paused = false;
@@ -140,12 +147,14 @@ function finishRun(r: RunResult) {
   sfx.music(null);
   if (r.won) sfx.victory();
   else sfx.defeat();
-  ui.result(r, bonus, () => {
-    mode = 'lobby';
-    sfx.music('lobby');
-    newDemo();
-    ui.lobby();
-  });
+  ui.result(r, bonus, () =>
+    slash(() => {
+      mode = 'lobby';
+      sfx.music('lobby');
+      newDemo();
+      ui.lobby();
+    }),
+  );
 }
 
 // ---------------- loop ----------------
@@ -198,4 +207,5 @@ sfx.music('lobby');
 document.fonts?.ready.then(() => undefined);
 newDemo();
 ui.lobby();
+openFromBlack();
 requestAnimationFrame(frame);

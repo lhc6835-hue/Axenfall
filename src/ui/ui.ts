@@ -142,9 +142,16 @@ export class UI {
     const w = el('div', 'lobby');
     w.innerHTML = `
       <div class="topbar">${this.goldChip()}</div>
-      <div class="title">
-        <h1>PARRY<span>CUBE</span></h1>
-        <p>패리 큐브 · 검 하나, 총 하나</p>
+      <div class="title logo">
+        <h1 class="logo-parry" aria-label="PARRY CUBE">
+          <span class="half top">PARRY</span><span class="half bot">PARRY</span>
+          <svg class="cut" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+            <defs><linearGradient id="cutg" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".25" stop-color="#fff" stop-opacity=".9"/><stop offset=".75" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>
+            <line x1="-6" y1="76" x2="106" y2="34" stroke="url(#cutg)" vector-effect="non-scaling-stroke" />
+          </svg>
+        </h1>
+        <div class="logo-cube" aria-hidden="true"><b>C</b><b>U</b><b>B</b><b>E</b></div>
+        <p class="logo-sub"><i></i>패리 큐브 · 검 하나, 총 하나<i></i></p>
       </div>
       <div class="eqline">
         <span class="tag gun">${gunById(eq.gun).name}</span>
