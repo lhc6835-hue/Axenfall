@@ -16,5 +16,7 @@ All clips were trimmed, normalised and re-encoded to MP3 for this game.
 - **"Oculus Audio Pack 01" by Oculus VR, LLC** (https://developers.meta.com/vr/downloads/package/oculus-audio-pack-1/),
   licensed under **CC BY 4.0** (https://creativecommons.org/licenses/by/4.0/). Files renamed to the UCS naming
   convention; OGG previews transcoded from the original WAVs. Further trimmed and re-encoded here.
-  `swing_*`, `blade`, `parry`, `anvil`, `sheathe`, `hit*`, `hurt`, `casing*`, `ui*`, `deny`, `buy`, `coin`,
+  `parry` / `parry_perfect` are the sword-clash recording pitched up, high-passed and run through a
+  struck-blade resonator, layered with a sword-scrape transient and a Kenney light metal tick.
+  `swing_*`, `blade`, `parry`, `parry_perfect`, `sheathe`, `hit*`, `hurt`, `casing*`, `ui*`, `deny`, `buy`, `coin`,
   `levelup`, `heal`, `victory`, `defeat`, `dash`.

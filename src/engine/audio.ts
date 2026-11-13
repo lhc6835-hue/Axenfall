@@ -8,7 +8,7 @@ const SFX = [
   'smg_out', 'smg_in', 'smg_bolt', 'pump_back', 'pump_fwd', 'shell_load',
   'bolt_up', 'bolt_back', 'bolt_fwd', 'bolt_down', 'clip', 'box_out', 'box_in', 'belt',
   'swing_s1', 'swing_s2', 'swing_s3', 'swing_m1', 'swing_m2', 'swing_m3', 'swing_h1', 'swing_h2',
-  'blade', 'parry', 'anvil', 'sheathe', 'hit1', 'hit2', 'hit3', 'hit_h1', 'hit_h2', 'hurt',
+  'blade', 'parry', 'parry_perfect', 'sheathe', 'hit1', 'hit2', 'hit3', 'hit_h1', 'hit_h2', 'hurt',
   'casing1', 'casing2', 'ui', 'ui_back', 'deny', 'buy', 'coin', 'levelup', 'heal', 'victory', 'defeat',
   'kill1', 'kill2', 'kill3', 'bhit1', 'bhit2', 'slam', 'slam2', 'eshot1', 'eshot2', 'rail', 'charge',
   'reflect', 'gem1', 'gem2', 'dash', 'click', 'boss', 'start',
@@ -227,8 +227,9 @@ class Sfx {
     this.play(['kill1', 'kill2', 'kill3'], { vol: 0.55, gate: 40, jitter: 0.12, max: 4 });
   }
   parry(perfect: boolean) {
-    this.play('parry', { vol: 1, rate: perfect ? 1.12 : 1, jitter: 0.02, gate: 40 });
-    if (perfect) this.play('anvil', { vol: 0.55, rate: 1.25, jitter: 0 });
+    // bright blade ring; PERFECT gets its own higher, longer ring
+    if (perfect) this.play('parry_perfect', { vol: 1, jitter: 0.015, gate: 40 });
+    else this.play('parry', { vol: 0.95, jitter: 0.03, gate: 40 });
     this.duckMusic(perfect ? 0.6 : 0.35, perfect ? 0.35 : 0.15);
   }
   reflect() {
