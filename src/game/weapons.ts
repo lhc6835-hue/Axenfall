@@ -56,6 +56,7 @@ export class GunCtl {
   hx = 0;
   hy = 0;
   fy = 1;
+  sideK = 1;
   drawAng = 0;
   private prevU = 0;
   /** true while firing (minigun slows the player) */
@@ -181,11 +182,15 @@ export class GunCtl {
     }
 
     // ---- placement ----
-    this.fy = Math.cos(this.aim) < 0 ? -1 : 1;
+    // flip the gun over only once it clearly points the other way, then slide the grip across
+    const ca = Math.cos(this.aim);
+    if ((this.fy > 0 && ca < -0.18) || (this.fy < 0 && ca > 0.18)) this.fy = -this.fy;
+    const ks = dt / 0.12;
+    this.sideK += Math.max(-ks, Math.min(ks, this.fy - this.sideK));
     const h = this.hold;
     const cs = Math.cos(this.aim), sn = Math.sin(this.aim);
-    this.hx = px + cs * h.d - sn * h.side * this.fy;
-    this.hy = py + sn * h.d + cs * h.side * this.fy;
+    this.hx = px + cs * h.d - sn * h.side * this.sideK;
+    this.hy = py + sn * h.d + cs * h.side * this.sideK;
   }
 
   rate() {
@@ -613,6 +618,13 @@ export class SwordCtl {
   side = 1;
   aim = 0;
   restAim = 0;
+  /** which way the body faces (+1 right, -1 left) and the smoothed blend between the two */
+  facing = 1;
+  faceK = 1;
+  private sinceFlip = 1;
+  private sinceAttack = 9;
+  /** sign used to mirror the blade art */
+  artFy = 1;
   /** absolute blade angle and hand pos */
   ang = 0;
   hx = 0;
@@ -656,7 +668,12 @@ export class SwordCtl {
     this.state = 'windup';
     this.t = 0;
     this.cd = this.def.cooldown * Math.max(0.35, this.run.mods.swordCd);
-    this.side = -this.side;
+    const k = this.def.kind;
+    const restSide = angDiff(a, this.restPose(0).ang) >= 0 ? 1 : -1;
+    const alternates = k === 'dagger' || k === 'longsword';
+    // a fresh attack winds up from where the blade already is; quick follow-ups alternate
+    this.side = alternates && this.sinceAttack < 0.7 ? -this.side : restSide;
+    this.sinceAttack = 0;
     this.combo++;
     this.hit.clear();
     this.hitStopDone = false;
@@ -689,31 +706,63 @@ export class SwordCtl {
     return [this.side * (half + 0.15), -this.side * (half + 0.25)];
   }
 
-  restPose(time: number): { ang: number; hand: number; dist: number } {
-    const a = this.restAim;
-    const k = this.def.kind;
-    switch (k) {
+  /** rest pose for a body facing right, given the aim folded into the right half */
+  private restRight(aimR: number, time: number, spinDir: number): { ang: number; hand: number; dist: number } {
+    // how much the resting weapon leans toward where you look
+    const lean = { dagger: 0.3, longsword: 0.35, rapier: 1, katana: 0.15, greatsword: 0.2, scythe: 0.2 }[this.def.kind];
+    const t = Math.max(-1.3, Math.min(1.3, angDiff(0, aimR))) * lean;
+    switch (this.def.kind) {
       case 'dagger': {
         let spin = 0;
-        if (this.twirl >= 0) spin = ease.outCubic(this.twirl) * TAU * 2;
-        return { ang: a + 2.4 + spin, hand: a + 1.7, dist: 8 };
+        if (this.twirl >= 0) spin = ease.outCubic(this.twirl) * TAU * 2 * spinDir;
+        // reverse grip at the side, blade pointing back and down
+        return { ang: 2.35 + t + spin, hand: 1.55 + t * 0.5, dist: 8 };
       }
       case 'longsword':
-        return { ang: a - 0.95 + Math.sin(time * 2) * 0.04, hand: a + 1.35, dist: 8 };
+        // held low in front, point raised
+        return { ang: -0.95 + t + Math.sin(time * 2) * 0.04, hand: 1.25 + t * 0.5, dist: 8 };
       case 'rapier':
-        return { ang: a + Math.sin(time * 3.1) * 0.12, hand: a + 0.75, dist: 9 + Math.sin(time * 3.1 + 1) * 0.7 };
+        // en garde: the point follows the aim
+        return { ang: t + Math.sin(time * 3.1) * 0.12, hand: 0.75 + t * 0.6, dist: 9 + Math.sin(time * 3.1 + 1) * 0.7 };
       case 'katana':
-        return { ang: a + Math.PI - 0.5, hand: a + 2.0, dist: 6 };
+        // saya at the hip, handle forward, tip trailing back and down
+        return { ang: Math.PI - 0.55 + t, hand: 1.75 + t * 0.3, dist: 6 };
       case 'greatsword':
-        return { ang: a + Math.PI * 0.82 + Math.sin(time * 1.6) * 0.03, hand: a + 1.9, dist: 5 };
+        // resting on the shoulder, blade back over the top
+        return { ang: -Math.PI * 0.82 + t + Math.sin(time * 1.6) * 0.03, hand: -1.45 + t * 0.3, dist: 5 };
       case 'scythe':
-        return { ang: a + Math.PI * 0.62 + Math.sin(time * 1.4) * 0.06, hand: a + 1.9, dist: 6 };
+        // carried behind, blade up
+        return { ang: -Math.PI * 0.6 + t + Math.sin(time * 1.4) * 0.06, hand: 1.9 + t * 0.3, dist: 6 };
     }
+  }
+
+  restPose(time: number): { ang: number; hand: number; dist: number } {
+    const a = this.restAim;
+    const right = this.restRight(a, time, 1);
+    // mirror across the vertical axis: angle -> PI - angle
+    const l = this.restRight(Math.PI - a, time, -1);
+    const left = { ang: Math.PI - l.ang, hand: Math.PI - l.hand, dist: l.dist };
+    const u = ease.inOutCubic((this.faceK + 1) / 2);
+    return {
+      ang: left.ang + angDiff(left.ang, right.ang) * u,
+      hand: left.hand + angDiff(left.hand, right.hand) * u,
+      dist: left.dist + (right.dist - left.dist) * u,
+    };
   }
 
   update(dt: number, px: number, py: number, wantAim: number, time: number) {
     this.cd -= dt;
     this.restAim += angDiff(this.restAim, wantAim) * Math.min(1, dt * 12);
+    this.sinceFlip += dt;
+    this.sinceAttack += dt;
+    const c = Math.cos(wantAim);
+    // don't flip-flop around straight up / down: need a clear lean and a short pause between flips
+    if (!this.busy && this.sinceFlip > 0.25 && ((this.facing > 0 && c < -0.3) || (this.facing < 0 && c > 0.3))) {
+      this.facing = -this.facing;
+      this.sinceFlip = 0;
+    }
+    const kstep = dt / 0.14;
+    this.faceK += Math.max(-kstep, Math.min(kstep, this.facing - this.faceK));
     if (this.parryT > 0) {
       this.parryT -= dt;
       this.parryAge += dt;
@@ -938,12 +987,13 @@ export class SwordCtl {
       g.line(a.tx, a.ty, b.tx, b.ty, k > 0.5 ? 0xffffff : c, Math.min(1, k * 1.6));
       g.glowLine(a.tx, a.ty, b.tx, b.ty, 5, def.color, 0.14 * k);
     }
-    const fy = Math.cos(this.ang) < 0 ? -1 : 1;
+    const fy = this.state === 'rest' ? (this.faceK >= 0 ? 1 : -1) : -this.side;
+    this.artFy = fy;
     // katana: the saya stays at the hip even when the blade is out
     if (def.kind === 'katana') {
       const rest = this.restPose(time);
       const sx = this.hx0 + Math.cos(rest.hand) * rest.dist, sy = this.hy0 + Math.sin(rest.hand) * rest.dist;
-      const S = new Xf(g, sx, sy, rest.ang, Math.cos(rest.ang) < 0 ? -1 : 1);
+      const S = new Xf(g, sx, sy, rest.ang, this.faceK >= 0 ? 1 : -1);
       if (this.state === 'rest') {
         drawSword(S, 'katana', def.color, time, true);
         if (showHand) hand(S, -3, 0, handC);
