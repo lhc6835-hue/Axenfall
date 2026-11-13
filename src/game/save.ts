@@ -48,6 +48,9 @@ function fresh(): Save {
   return s;
 }
 
+/** called after every save to disk (the cloud sync listens here) */
+export const onPersist: (() => void)[] = [];
+
 export let save: Save = load();
 persist();
 
@@ -65,12 +68,29 @@ function load(): Save {
   return fresh();
 }
 
+/** device settings stay on the device; everything else is progress */
+const DEVICE_KEYS = ['sound', 'music', 'fullscreen', 'sfxVol', 'musicVol'] as const;
+export function progressOf(s: Save): Partial<Save> {
+  const out: Record<string, unknown> = { ...s };
+  for (const k of DEVICE_KEYS) delete out[k];
+  return JSON.parse(JSON.stringify(out));
+}
+/** take progress from elsewhere (the cloud) and keep this device's settings */
+export function replaceProgress(p: Partial<Save>) {
+  const f = fresh();
+  const keep: Record<string, unknown> = {};
+  for (const k of DEVICE_KEYS) keep[k] = save[k];
+  save = { ...f, ...p, eq: { ...f.eq, ...p.eq }, shop: { ...f.shop, ...p.shop }, best: { ...f.best, ...p.best }, ...keep } as Save;
+  persist();
+}
+
 export function persist() {
   try {
     localStorage.setItem(KEY, JSON.stringify(save));
   } catch {
     /* ignore */
   }
+  for (const f of onPersist) f();
 }
 
 export function resetSave() {

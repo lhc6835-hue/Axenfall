@@ -1,5 +1,6 @@
 import { Gfx } from './engine/gfx';
-import { Input } from './engine/input';
+import { Input, isTyping } from './engine/input';
+import { cloud, initCloud } from './net/cloud';
 import { sfx } from './engine/audio';
 import { clamp } from './engine/math';
 import { gunById, skinById, swordById, type GunDef, type SkinDef, type SwordDef } from './game/data';
@@ -205,7 +206,8 @@ addEventListener('touchstart', unlock);
 // any click (or key) in the game goes fullscreen, unless turned off in settings
 const goFull = (e: Event) => {
   if (!save.fullscreen) return;
-  if (e instanceof KeyboardEvent && (e.code === 'Escape' || e.repeat)) return;
+  if (e instanceof KeyboardEvent && (e.code === 'Escape' || e.repeat || isTyping(e))) return;
+  if ((e.target as HTMLElement | null)?.closest?.('.acct-modal')) return;
   enterFullscreen();
 };
 addEventListener('pointerup', goFull);
@@ -228,4 +230,16 @@ document.fonts?.ready.then(() => undefined);
 newDemo();
 ui.lobby();
 openFromBlack();
+
+// accounts: progress pulled from the cloud redraws the lobby; disagreements are put to the player
+cloud.setConflictHandler((c) => ui.conflict(c));
+addEventListener('parrycube:progress', () => {
+  if (mode !== 'lobby') return;
+  previewOv = null;
+  newDemo();
+  if (ui.current === 'lobby') ui.lobby();
+  else if (ui.current === 'shop') ui.shop();
+  else if (ui.current === 'loadout') ui.loadout();
+});
+initCloud();
 requestAnimationFrame(frame);

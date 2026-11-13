@@ -8,6 +8,7 @@ import {
 import { buy, catalog, checkTimedRestock, persist, priceOf, purchasable, rerollCost, reroll, resetSave, save, type ShopCat, type Slot } from '../game/save';
 import type { RunResult } from '../game/run';
 import { canFullscreen, enterFullscreen, exitFullscreen } from './fullscreen';
+import { cloud, errorText, signIn, signOut, syncNow, type ConflictChoice, type Summary } from '../net/cloud';
 
 export interface AppApi {
   startRun(): void;
@@ -135,6 +136,8 @@ function bindVolume(m: HTMLElement) {
   });
 }
 
+const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+
 // ---------------- title decoration ----------------
 /** crossed katana and revolver, drawn with the game's own pixel art, keyed to transparent */
 function paintEmblem(c: HTMLCanvasElement) {
@@ -217,7 +220,7 @@ export class UI {
     const eq = save.eq;
     const w = el('div', 'lobby');
     w.innerHTML = `
-      <div class="topbar">${this.goldChip()}</div>
+      <div class="topbar"><span class="acct-slot"></span>${this.goldChip()}</div>
       <div class="title logo">
         <div class="logo-aura" aria-hidden="true"></div>
         <canvas class="logo-emblem" width="84" height="44" aria-hidden="true"></canvas>
@@ -256,6 +259,7 @@ export class UI {
     w.querySelector<HTMLElement>('[data-a=opt]')!.onclick = () => { sfx.ui(); this.options(); };
     root().appendChild(w);
     decorateLogo(w);
+    this.mountAccount(w);
   }
 
   options() {
@@ -571,6 +575,141 @@ export class UI {
       sfx.ui();
       onDone();
     };
+    root().appendChild(m);
+  }
+
+  // ---------------- account ----------------
+  private mountAccount(w: HTMLElement) {
+    const slot = w.querySelector<HTMLElement>('.acct-slot');
+    if (!slot) return;
+    const paint = () => {
+      if (!slot.isConnected) return unsub();
+      const st = cloud.status;
+      if (st === 'off' || st === 'checking') {
+        slot.innerHTML = '';
+        return;
+      }
+      const label = st === 'nodb' ? '서버 미연결' : cloud.user ? cloud.user : '로그인';
+      const dot = st === 'syncing' ? 'sync' : st === 'error' || st === 'nodb' ? 'err' : cloud.user ? 'ok' : '';
+      slot.innerHTML = `<button class="acct ${dot}"><i></i>${escapeHtml(label)}</button>`;
+      slot.querySelector<HTMLElement>('button')!.onclick = () => {
+        sfx.ui();
+        if (cloud.user) this.accountPanel();
+        else if (st !== 'nodb') this.loginPanel('login');
+      };
+    };
+    const unsub = cloud.subscribe(paint);
+    paint();
+  }
+
+  loginPanel(mode: 'login' | 'signup') {
+    document.querySelector('.modal.acct-modal')?.remove();
+    const m = el('div', 'modal acct-modal');
+    const signup = mode === 'signup';
+    m.innerHTML = `<form class="box small acct-form" autocomplete="on">
+      <div class="tabs acct-tabs">
+        <button type="button" data-m="login" class="${signup ? '' : 'on'}">로그인</button>
+        <button type="button" data-m="signup" class="${signup ? 'on' : ''}">회원가입</button>
+      </div>
+      <label class="field"><span>아이디</span><input name="id" maxlength="16" autocomplete="username" spellcheck="false" autocapitalize="off" required></label>
+      <label class="field"><span>비밀번호</span><input name="pw" type="password" maxlength="64" autocomplete="${signup ? 'new-password' : 'current-password'}" required></label>
+      ${signup ? '<label class="field"><span>비밀번호 확인</span><input name="pw2" type="password" maxlength="64" autocomplete="new-password" required></label>' : ''}
+      <p class="form-note">${signup ? '아이디: 영문·숫자·밑줄 3~16자 (대소문자 구분 없음) · 비밀번호: 6자 이상' : '로그인하면 진행 상황이 클라우드에 저장된다'}</p>
+      <p class="form-err" role="alert"></p>
+      <button class="btn primary" type="submit">${signup ? '가입하기' : '로그인'}</button>
+      <button class="btn ghost" type="button" data-a="close">닫기</button>
+    </form>`;
+    const form = m.querySelector('form')!;
+    const err = m.querySelector<HTMLElement>('.form-err')!;
+    m.querySelectorAll<HTMLElement>('[data-m]').forEach((b) => (b.onclick = () => this.loginPanel(b.dataset.m as 'login' | 'signup')));
+    m.querySelector<HTMLElement>('[data-a=close]')!.onclick = () => m.remove();
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      const id = String(fd.get('id') ?? '').trim();
+      const pw = String(fd.get('pw') ?? '');
+      if (signup && pw !== String(fd.get('pw2') ?? '')) {
+        err.textContent = '비밀번호 확인 불일치';
+        return;
+      }
+      const btn = form.querySelector<HTMLButtonElement>('button[type=submit]')!;
+      btn.disabled = true;
+      err.textContent = '';
+      try {
+        await signIn(mode, id, pw);
+        sfx.buy();
+        m.remove();
+        this.toast(signup ? `${cloud.user} 가입 완료` : `${cloud.user} 로그인`);
+      } catch (x) {
+        sfx.deny();
+        err.textContent = errorText(x);
+        btn.disabled = false;
+      }
+    };
+    root().appendChild(m);
+    m.querySelector<HTMLInputElement>('input[name=id]')!.focus();
+  }
+
+  accountPanel() {
+    document.querySelector('.modal.acct-modal')?.remove();
+    const m = el('div', 'modal acct-modal');
+    const when = cloud.lastSync ? new Date(cloud.lastSync).toLocaleString('ko-KR', { hour12: false }) : '-';
+    m.innerHTML = `<div class="box small">
+      <h2>계정</h2>
+      <div class="acct-info"><span>아이디</span><b>${escapeHtml(cloud.user)}</b></div>
+      <div class="acct-info"><span>마지막 동기화</span><b class="when">${when}</b></div>
+      <button class="btn" data-a="sync">지금 동기화</button>
+      <button class="btn ghost danger" data-a="out">로그아웃</button>
+      <button class="btn" data-a="close">닫기</button>
+    </div>`;
+    m.querySelector<HTMLElement>('[data-a=close]')!.onclick = () => m.remove();
+    m.querySelector<HTMLElement>('[data-a=sync]')!.onclick = async () => {
+      sfx.ui();
+      try {
+        await syncNow();
+        this.toast('동기화 완료');
+        m.remove();
+      } catch (x) {
+        this.toast(errorText(x));
+      }
+    };
+    m.querySelector<HTMLElement>('[data-a=out]')!.onclick = async () => {
+      sfx.ui();
+      await signOut();
+      this.toast('로그아웃');
+      m.remove();
+    };
+    root().appendChild(m);
+  }
+
+  /** this device and the cloud disagree: let the player pick which progress to keep */
+  conflict(c: ConflictChoice) {
+    document.querySelector('.modal.acct-modal')?.remove();
+    const m = el('div', 'modal acct-modal');
+    const card = (title: string, s: Summary, k: 'local' | 'cloud') => `
+      <button class="pick" data-k="${k}">
+        <b>${title}</b>
+        <span><i>골드</i>${fmt(s.gold)}</span>
+        <span><i>무기</i>${s.weapons}</span>
+        <span><i>스킨</i>${s.skins}</span>
+        <span><i>출격</i>${s.runs}</span>
+        <span><i>최고 기록</i>${Math.floor(s.bestTime / 60)}분 ${Math.floor(s.bestTime % 60)}초</span>
+        ${s.updated ? `<em>${new Date(s.updated).toLocaleString('ko-KR', { hour12: false })}</em>` : '<em>현재 기기</em>'}
+      </button>`;
+    m.innerHTML = `<div class="box">
+      <h2>저장 데이터 선택</h2>
+      <p class="sub">이 기기와 클라우드의 진행 상황이 다르다. 남길 쪽을 선택하면 다른 쪽은 덮어쓴다.</p>
+      <div class="picks">${card('이 기기', c.local, 'local')}${card('클라우드', c.cloud, 'cloud')}</div>
+    </div>`;
+    m.querySelectorAll<HTMLElement>('.pick').forEach(
+      (b) =>
+        (b.onclick = async () => {
+          sfx.ui();
+          m.remove();
+          await c.choose(b.dataset.k as 'local' | 'cloud');
+          this.toast(b.dataset.k === 'cloud' ? '클라우드 저장 적용' : '이 기기 저장으로 덮어씀');
+        }),
+    );
     root().appendChild(m);
   }
 

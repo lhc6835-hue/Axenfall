@@ -1,5 +1,11 @@
 export type Btn = 'slash' | 'dash' | 'pause' | 'reload';
 
+/** keys typed into a text field belong to the field, not the game */
+export const isTyping = (e: Event) => {
+  const t = e.target as HTMLElement | null;
+  return !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+};
+
 export class Input {
   keys = new Set<string>();
   private pressed = new Set<Btn>();
@@ -12,7 +18,7 @@ export class Input {
 
   constructor() {
     addEventListener('keydown', (e) => {
-      if (e.repeat) return;
+      if (e.repeat || isTyping(e)) return;
       const k = e.code;
       this.keys.add(k);
       if (k === 'Space' || k === 'KeyJ' || k === 'KeyK') this.press('slash');

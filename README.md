@@ -81,12 +81,41 @@ npm run build    # dist/ 에 정적 빌드
 - 이미 가진 무기를 또 사면 강화돼요 (+8% 피해, 최대 +5).
 - 카드를 누르면 로비의 큐브가 그 무기나 스킨으로 직접 시연해요.
 
+## 계정 · 클라우드 저장 (Cloudflare)
+
+아이디/비밀번호로 가입하면 골드·무기·스킨·장비·기록·상점이 클라우드에 저장되고, 다른 기기에서 로그인해 이어서 할 수 있다.
+효과음·배경음·전체화면 같은 기기 설정은 동기화하지 않는다. 두 기기의 진행이 다르면 어느 쪽을 남길지 고르는 창이 뜬다.
+
+서버는 `functions/api/[[route]].ts`(Cloudflare Pages Functions)이고 데이터는 Cloudflare D1에 저장된다.
+비밀번호는 PBKDF2(SHA-256, 100,000회)로 해시해 저장하고, 로그인 토큰도 해시로만 보관하며 30일 뒤 만료된다.
+비밀번호를 5번 틀리면 1분간 잠긴다. 테이블은 첫 요청 때 자동으로 만들어진다.
+
+### 연결 방법
+1. Cloudflare 대시보드 → **Workers & Pages** → **Create** → **Pages** → **Connect to Git** → 이 저장소 선택
+   - Production branch: `ccr-dd5f27cd-agud00` · Build command: `npm run build` · Build output directory: `dist`
+2. **Storage & Databases → D1** → **Create database** (이름 예: `parrycube`)
+3. 만든 Pages 프로젝트 → **Settings → Bindings → Add → D1 database**
+   - Variable name: `DB` · Database: 2번에서 만든 데이터베이스 → 저장 후 **재배포**
+4. `https://<프로젝트>.pages.dev`로 접속하면 로비 오른쪽 위에 **로그인** 버튼이 나온다.
+
+GitHub Pages 쪽(`github.io`)에서도 계정을 쓰려면 `src/net/cloud.ts`의 `CLOUD_API`에 Pages 주소를 넣는다.
+다른 주소에서 API를 부르려면 Pages 환경 변수 `ALLOWED_ORIGINS`에 쉼표로 구분해 넣는다.
+
+### 로컬에서 시험
+```bash
+npm run build
+npx wrangler pages dev dist --d1 DB=local-parrycube --port 8788   # API + 로컬 D1
+npm run dev                                                        # /api 요청은 8788로 프록시
+```
+
 ## 구조
 
 ```
 src/engine   픽셀 렌더러(색 버퍼 + 가산 광원 버퍼, 디더링), 입력, 오디오(효과음·배경음)
 src/game     무기/적/플레이어/월드, 이펙트, 데이터, 세이브·상점
-src/ui       HUD, 로비/상점/장비/레벨업 화면
+src/ui       HUD, 로비/상점/장비/레벨업 화면, 계정 창
+src/net      클라우드 저장 클라이언트
+functions    Cloudflare Pages Functions (계정 · 저장 API)
 ```
 
 그래픽은 이미지 파일 없이 전부 코드로 그려요.
