@@ -504,7 +504,7 @@ export class Run {
         const a = (i / n) * TAU;
         this.spawn(i % 3 === 0 ? 'runner' : 'grunt', false, this.player.x + Math.cos(a) * R, this.player.y + Math.sin(a) * R);
       }
-      this.hooks?.banner('포위!', '사방에서 몰려와요', '#ff8a5a');
+      this.hooks?.banner('포위', '사방에서 몰려온다', '#ff8a5a');
     }
     this.eliteT -= dt;
     if (this.eliteT <= 0) {

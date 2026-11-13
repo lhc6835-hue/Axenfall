@@ -190,7 +190,7 @@ export class UI {
       <div class="best">최고 기록 ${Math.floor(save.best.time / 60)}분 ${Math.floor(save.best.time % 60)}초 · 처치 ${save.best.kills} · 출격 ${save.runs}회</div>
       <div class="help">
         <b>이동</b> WASD · <b>베기/패리</b> 스페이스 · 마우스 클릭 · <b>대시</b> Shift · <b>재장전</b> R · <b>일시정지</b> Esc<br>
-        총은 알아서 쏴요. 적의 <em>!</em> 신호에 맞춰 베면 패리, 공격 직전에 베면 <em>PERFECT</em>.
+        총은 자동 사격 · 적의 <em>!</em> 신호에 맞춰 베면 패리 · 공격 직전에 베면 <em>PERFECT</em>
       </div>`;
     w.querySelector<HTMLElement>('[data-a=go]')!.onclick = () => { sfx.ui(); this.app.startRun(); };
     w.querySelector<HTMLElement>('[data-a=shop]')!.onclick = () => { sfx.ui(); this.shop(); };
@@ -236,7 +236,7 @@ export class UI {
         (e.target as HTMLElement).textContent = `전체화면: ${save.fullscreen ? '자동' : '끔'}`;
       };
     m.querySelector<HTMLElement>('[data-a=reset]')!.onclick = () => {
-      if (confirm('골드, 무기, 스킨이 모두 사라져요. 정말 초기화할까요?')) {
+      if (confirm('골드, 무기, 스킨이 모두 삭제됩니다. 초기화하시겠습니까?')) {
         resetSave();
         this.app.refreshDemo();
         this.lobby();
@@ -273,7 +273,7 @@ export class UI {
         <button class="btn small" data-a="reroll">새로고침 <b class="coin"></b>${fmt(rerollCost())}</button>
       </div>
       <div class="odds">입고 확률 ${odds}</div>
-      <div class="hint">카드를 누르면 왼쪽 큐브가 직접 시연해요 · 이미 가진 무기를 또 사면 강화(+${Math.round(ENHANCE_BONUS * 100)}% 피해, 최대 +${ENHANCE_MAX})</div>`;
+      <div class="hint">카드를 선택하면 큐브가 시연 · 보유한 무기를 다시 구매하면 강화(+${Math.round(ENHANCE_BONUS * 100)}% 피해, 최대 +${ENHANCE_MAX})</div>`;
     const grid = p.querySelector('.grid')!;
     const slots: Slot[] = save.shop[tab];
     slots.forEach((slot) => grid.appendChild(this.shopCard(tab, slot)));
@@ -285,7 +285,7 @@ export class UI {
         this.shop(tab);
       } else {
         sfx.deny();
-        this.toast('골드가 부족해요');
+        this.toast('골드 부족');
       }
     };
     const rs = p.querySelector<HTMLElement>('.restock')!;
@@ -348,13 +348,13 @@ export class UI {
         if (cat === 'sword' && save.swords[slot.id] === 0) save.eq.sword = slot.id;
         if (cat === 'skin') save.eq.skin = slot.id;
         persist();
-        this.toast(`${def.name} 구매 완료!`);
+        this.toast(`${def.name} 구매 완료`);
         this.app.preview(null);
         this.app.refreshDemo();
         this.shop(cat);
       } else {
         sfx.deny();
-        this.toast(res === 'gold' ? '골드가 부족해요' : res === 'stock' ? '재고가 없어요' : '더 살 수 없어요');
+        this.toast(res === 'gold' ? '골드 부족' : res === 'stock' ? '재고 없음' : '구매 불가');
       }
     };
     return card;
@@ -377,7 +377,7 @@ export class UI {
       <h3>총</h3><div class="list" data-c="gun"></div>
       <h3>검</h3><div class="list" data-c="sword"></div>
       <h3>큐브 스킨</h3><div class="list" data-c="skin"></div>
-      <div class="hint">상점에서 산 장비만 여기 나와요 · 모두 ${GUNS.length}종 총, ${SWORDS.length}종 검, ${SKINS.length}종 스킨</div>`;
+      <div class="hint">상점에서 구매한 장비만 표시 · 총 ${GUNS.length}종 · 검 ${SWORDS.length}종 · 스킨 ${SKINS.length}종</div>`;
     const fill = (cat: ShopCat) => {
       const list = p.querySelector(`[data-c=${cat}]`)!;
       const all = cat === 'gun' ? GUNS : cat === 'sword' ? SWORDS : SKINS;
@@ -388,7 +388,7 @@ export class UI {
         const row = el('div', `row r-${d.rarity} ${d.id === eqId ? 'eq' : ''} ${has ? '' : 'locked'}`);
         const lv = cat === 'gun' ? save.guns[d.id] : cat === 'sword' ? save.swords[d.id] : undefined;
         row.innerHTML = `<div class="pvbox"></div><div class="rinfo"><div class="nm"><span style="color:${RARITY[d.rarity].color}">${RARITY[d.rarity].name}</span> ${has ? d.name : '???'}${lv ? ` <em>+${lv}</em>` : ''}</div>
-          <div class="hold">${has ? (cat === 'skin' ? (d as SkinDef).desc : (d as GunDef | SwordDef).hold) : '상점에서 구할 수 있어요'}</div></div>
+          <div class="hold">${has ? (cat === 'skin' ? (d as SkinDef).desc : (d as GunDef | SwordDef).hold) : '상점에서 구매 가능'}</div></div>
           <div class="eqmark">${d.id === eqId ? '장착 중' : has ? '장착' : ''}</div>`;
         if (has) row.querySelector('.pvbox')!.appendChild(previewCanvas({ cat, id: d.id }));
         else row.querySelector('.pvbox')!.innerHTML = '<div class="lockbox">?</div>';
@@ -418,7 +418,7 @@ export class UI {
     this.clear();
     this.current = 'none';
     const m = el('div', 'modal lv');
-    m.innerHTML = `<div class="box wide"><h2>레벨 업!</h2><p class="sub">하나를 골라요 (1 · 2 · 3)</p><div class="choices"></div></div>`;
+    m.innerHTML = `<div class="box wide"><h2>레벨 업!</h2><p class="sub">강화 하나 선택 (1 · 2 · 3)</p><div class="choices"></div></div>`;
     const box = m.querySelector('.choices')!;
     const choose = (u: Upgrade) => {
       sfx.ui();
@@ -461,7 +461,7 @@ export class UI {
       <label class="vol"><span>효과음 크기</span><input type="range" min="0" max="100" step="5" data-v="sfx" value="${Math.round(save.sfxVol * 100)}"><b>${Math.round(save.sfxVol * 100)}</b></label>
       <label class="vol"><span>배경음 크기</span><input type="range" min="0" max="100" step="5" data-v="music" value="${Math.round(save.musicVol * 100)}"><b>${Math.round(save.musicVol * 100)}</b></label>
       ${canFullscreen() ? `<button class="btn" data-a="fs">전체화면: ${save.fullscreen ? '자동' : '끔'}</button>` : ''}
-      <button class="btn ghost danger" data-a="quit">포기하고 로비로 (모은 골드는 받아요)</button>
+      <button class="btn ghost danger" data-a="quit">포기하고 로비로 (획득 골드 유지)</button>
     </div>`;
     m.querySelector<HTMLElement>('[data-a=resume]')!.onclick = () => this.app.resume();
     m.querySelector<HTMLElement>('[data-a=snd]')!.onclick = (e) => {
@@ -495,7 +495,7 @@ export class UI {
     const m = el('div', 'modal');
     const t = `${Math.floor(r.time / 60)}분 ${Math.floor(r.time % 60)}초`;
     m.innerHTML = `<div class="box">
-      <h2 class="${r.won ? 'win' : 'lose'}">${r.won ? '승리!' : '쓰러졌어요'}</h2>
+      <h2 class="${r.won ? 'win' : 'lose'}">${r.won ? '승리' : '패배'}</h2>
       <div class="res">
         <div><i>생존 시간</i><b>${t}</b></div>
         <div><i>처치</i><b>${r.kills}</b></div>
@@ -505,7 +505,7 @@ export class UI {
         <div><i>보너스</i><b>+${fmt(bonus)}</b></div>
       </div>
       <div class="total"><b class="coin"></b> +${fmt(r.gold + bonus)} <span>보유 ${fmt(save.gold)}</span></div>
-      <p class="sub">상점에 새 물건이 들어왔어요!</p>
+      <p class="sub">상점에 새 물품 입고</p>
       <button class="btn primary" data-a="ok">로비로</button>
     </div>`;
     m.querySelector<HTMLElement>('[data-a=ok]')!.onclick = () => {

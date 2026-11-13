@@ -129,7 +129,7 @@ function beginRun() {
       banner = { text, sub, color, t: 2.4 };
     },
   }, false, mouseWorld);
-  banner = { text: '출격!', sub: '10분을 버티거나 최종 보스를 쓰러뜨려요', color: '#ffe46a', t: 2.4 };
+  banner = { text: '출격!', sub: '10분 생존 또는 최종 보스 처치', color: '#ffe46a', t: 2.4 };
   touchLayer.classList.toggle('on', isTouch);
   sfx.music('battle');
   sfx.runStart();
