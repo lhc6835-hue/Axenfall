@@ -169,14 +169,23 @@ export class UI {
     m.innerHTML = `<div class="box small">
       <h2>설정</h2>
       <button class="btn" data-a="snd">효과음: ${save.sound ? '켜짐' : '꺼짐'}</button>
+      <button class="btn" data-a="bgm">배경음: ${save.music ? '켜짐' : '꺼짐'}</button>
       <button class="btn ghost danger" data-a="reset">저장 데이터 초기화</button>
       <button class="btn" data-a="close">닫기</button>
+      <p class="credits">음악 Komiku (CC0) · 총기 녹음 Free Firearm Sound Library (CC0) · 효과음 Kenney (CC0), Beatscribe (CC0),
+      "Oculus Audio Pack 01" by Oculus VR, LLC (CC BY 4.0)</p>
     </div>`;
     m.querySelector<HTMLElement>('[data-a=snd]')!.onclick = (e) => {
       save.sound = !save.sound;
       sfx.setEnabled(save.sound);
       persist();
       (e.target as HTMLElement).textContent = `효과음: ${save.sound ? '켜짐' : '꺼짐'}`;
+    };
+    m.querySelector<HTMLElement>('[data-a=bgm]')!.onclick = (e) => {
+      save.music = !save.music;
+      sfx.setMusic(save.music);
+      persist();
+      (e.target as HTMLElement).textContent = `배경음: ${save.music ? '켜짐' : '꺼짐'}`;
     };
     m.querySelector<HTMLElement>('[data-a=reset]')!.onclick = () => {
       if (confirm('골드, 무기, 스킨이 모두 사라져요. 정말 초기화할까요?')) {
@@ -400,6 +409,7 @@ export class UI {
       <h2>일시정지</h2>
       <button class="btn primary" data-a="resume">계속하기</button>
       <button class="btn" data-a="snd">효과음: ${save.sound ? '켜짐' : '꺼짐'}</button>
+      <button class="btn" data-a="bgm">배경음: ${save.music ? '켜짐' : '꺼짐'}</button>
       <button class="btn ghost danger" data-a="quit">포기하고 로비로 (모은 골드는 받아요)</button>
     </div>`;
     m.querySelector<HTMLElement>('[data-a=resume]')!.onclick = () => this.app.resume();
@@ -408,6 +418,12 @@ export class UI {
       sfx.setEnabled(save.sound);
       persist();
       (e.target as HTMLElement).textContent = `효과음: ${save.sound ? '켜짐' : '꺼짐'}`;
+    };
+    m.querySelector<HTMLElement>('[data-a=bgm]')!.onclick = (e) => {
+      save.music = !save.music;
+      sfx.setMusic(save.music);
+      persist();
+      (e.target as HTMLElement).textContent = `배경음: ${save.music ? '켜짐' : '꺼짐'}`;
     };
     m.querySelector<HTMLElement>('[data-a=quit]')!.onclick = () => this.app.quitRun();
     root().appendChild(m);

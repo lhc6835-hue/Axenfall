@@ -68,11 +68,18 @@ npm run build    # dist/ 에 정적 빌드
 ## 구조
 
 ```
-src/engine   픽셀 렌더러(색 버퍼 + 가산 광원 버퍼, 디더링), 입력, 합성 효과음
+src/engine   픽셀 렌더러(색 버퍼 + 가산 광원 버퍼, 디더링), 입력, 오디오(효과음·배경음)
 src/game     무기/적/플레이어/월드, 이펙트, 데이터, 세이브·상점
 src/ui       HUD, 로비/상점/장비/레벨업 화면
 ```
 
-그래픽과 소리는 이미지·음원 파일 없이 전부 코드로 만들어요.
+그래픽은 이미지 파일 없이 전부 코드로 그려요.
+
+## 사운드
+
+- 배경음: Komiku (CC0) — 로비, 전투, 보스 2곡. 보스가 나오면 자동으로 바뀌어요.
+- 총소리·장전 소리: Free Firearm Sound Library (CC0) 실총 녹음. 총마다 탄창, 슬라이드, 실린더, 펌프, 노리쇠 소리가 따로 나요.
+- 그 밖의 효과음: Kenney (CC0), Beatscribe (CC0), "Oculus Audio Pack 01" by Oculus VR, LLC (**CC BY 4.0**, 출처 표기 필요).
+- 자세한 출처는 `public/audio/CREDITS.md`에 있어요. 설정에서 효과음과 배경음을 따로 끌 수 있어요.
 이펙트는 [pixelfx](https://github.com/patch-gg/pixelfx) 스킬의 방법론(예비동작 → 타격 프리즈 → 회복, 빛과 선 위주의 연출)을 참고해서 직접 작성했어요.
 폰트는 [Galmuri](https://github.com/quiple/galmuri) (SIL OFL)를 써요.

@@ -160,7 +160,7 @@ export class GunCtl {
       const aligned = Math.abs(angDiff(this.aim, want)) < 0.35;
       if (def.kind === 'railgun') {
         if (this.cd <= 0 && aligned) {
-          if (this.charge === 0) sfx.charge(0.32);
+          if (this.charge === 0) sfx.charge();
           this.charge += dt / 0.34;
           if (this.charge >= 1) {
             this.charge = 0;
@@ -302,32 +302,33 @@ export class GunCtl {
         if (at(0.18)) {
           const [x, y] = X.pt(-0.5, 4);
           fx.chunk(x, y, Math.cos(this.aim) * -20, 25, 0x7d8299, 3, 1.5);
-          sfx.click(0.8);
+          sfx.foley('mag_out');
         }
-        if (at(0.58)) sfx.click(1.2);
-        if (at(0.8)) sfx.clack();
+        if (at(0.56)) sfx.foley('mag_in');
+        if (at(0.78)) sfx.foley('slide');
         break;
       case 'revolver':
-        if (at(0.06)) sfx.click(0.9);
+        if (at(0.05)) sfx.foley('cyl_open');
         if (at(0.2)) {
           for (let i = 0; i < 6; i++) this.ejectCasing(0xe8b64a, 2, 1);
         }
-        for (const k of [0.3, 0.35, 0.4, 0.45]) if (at(k)) sfx.click(1.3);
-        if (at(0.53)) sfx.clack();
-        if (at(0.56)) sfx.spin();
+        for (const k of [0.3, 0.36, 0.42, 0.48]) if (at(k)) sfx.foley('shell_in', 0.7, 1 + Math.random() * 0.1);
+        if (at(0.53)) sfx.foley('cyl_close');
+        if (at(0.56)) sfx.foley('cyl_spin', 0.6, 1.2);
+        if (at(0.6) || at(0.78)) sfx.spin();
         if (at(0.97)) {
           this.kickV += 30;
-          sfx.click(1.6);
+          sfx.click(1.4);
         }
         break;
       case 'smg':
         if (at(0.16)) {
           const [x, y] = X.pt(4, 5);
           fx.chunk(x, y, Math.cos(this.aim) * -15, 30, 0x2a2a38, 2, 6);
-          sfx.click(0.7);
+          sfx.foley('smg_out');
         }
-        if (at(0.6)) sfx.clack();
-        if (at(0.85)) sfx.click(1.4);
+        if (at(0.58)) sfx.foley('smg_in');
+        if (at(0.8)) sfx.foley('smg_bolt');
         break;
       case 'shotgun': {
         const T = this.rdur * this.run.mods.reloadSpd;
@@ -337,41 +338,49 @@ export class GunCtl {
           if (at(k)) {
             this.ammo = Math.min(this.magSize(), this.ammo + 1);
             this.kickV -= 25;
-            sfx.click(1.1);
+            sfx.foley('shell_load', 0.8, 1 + Math.random() * 0.08);
           }
         }
-        const pumpAt = (0.18 + this.shellsToLoad * per + 0.12) / T;
-        if (at(pumpAt)) sfx.clack();
+        const pumpAt = (0.18 + this.shellsToLoad * per + 0.06) / T;
+        const pumpAt2 = (0.18 + this.shellsToLoad * per + 0.18) / T;
+        if (at(pumpAt)) sfx.foley('pump_back');
+        if (at(pumpAt2)) sfx.foley('pump_fwd');
         break;
       }
       case 'sniper':
-        if (at(0.1)) sfx.click(0.9);
-        for (const k of [0.3, 0.37, 0.44, 0.51, 0.58]) if (at(k)) sfx.click(1.3);
-        if (at(0.82)) sfx.clack();
+        if (at(0.03)) sfx.foley('bolt_up');
+        if (at(0.1)) sfx.foley('bolt_back');
+        if (at(0.3)) sfx.foley('clip');
+        for (const k of [0.4, 0.48, 0.56]) if (at(k)) sfx.foley('shell_in', 0.6, 1.1);
+        if (at(0.72)) sfx.foley('bolt_fwd');
+        if (at(0.83)) sfx.foley('bolt_down');
         break;
       case 'minigun':
         if (at(0.2)) {
           const [x, y] = X.pt(-4, 4);
           fx.chunk(x, y, Math.cos(this.aim) * -10, 20, 0x56603a, 6, 4, 2.2);
-          sfx.slam();
+          sfx.foley('box_out');
+          sfx.foley('slam2', 0.5, 1.3);
         }
-        if (at(0.62)) sfx.clack();
-        if (at(0.78)) sfx.spin();
+        if (at(0.6)) sfx.foley('box_in');
+        if (at(0.7)) sfx.foley('belt');
+        if (at(0.8)) sfx.spin();
         break;
       case 'railgun':
-        if (at(0.12)) sfx.clack();
+        if (at(0.1)) sfx.foley('smg_out', 0.8, 0.8);
         if (at(0.18)) {
           const [x, y] = X.pt(-7, 1);
           fx.chunk(x, y, Math.cos(this.aim) * -15, 25, 0x63f0ff, 3, 2);
           fx.smoke(x, y, 4, 0x8a96aa, 3, 1);
+          sfx.foley('dash', 0.4, 0.6);
         }
         if (u1 > 0.2 && u1 < 0.5 && Math.random() < 0.35) {
           const [x, y] = X.pt(rand(0, 16), -4);
           fx.smoke(x, y, 1, 0x9aa6ba, 2, 0.8);
         }
-        if (at(0.62)) sfx.click(1.1);
-        if (at(0.68)) sfx.charge(0.6);
-        if (at(0.96)) sfx.clack();
+        if (at(0.6)) sfx.foley('mag_in', 0.8, 0.85);
+        if (at(0.68)) sfx.charge();
+        if (at(0.95)) sfx.foley('smg_bolt', 0.7, 0.8);
         break;
     }
   }
@@ -379,13 +388,15 @@ export class GunCtl {
   private cycleEvents(c0: number, c1: number) {
     const at = (k: number) => c0 < k && c1 >= k;
     if (this.def.kind === 'shotgun') {
-      if (at(0.15)) sfx.click(0.8);
+      if (at(0.12)) sfx.foley('pump_back');
       if (at(0.45)) this.ejectCasing(0xd0403a, 3, 1.6);
-      if (at(0.75)) sfx.clack();
+      if (at(0.62)) sfx.foley('pump_fwd');
     } else if (this.def.kind === 'sniper') {
-      if (at(0.15)) sfx.click(0.9);
+      if (at(0.02)) sfx.foley('bolt_up', 0.7);
+      if (at(0.22)) sfx.foley('bolt_back', 0.7);
       if (at(0.45)) this.ejectCasing(0xe8b64a, 3, 1);
-      if (at(0.75)) sfx.clack();
+      if (at(0.5)) sfx.foley('bolt_fwd', 0.7);
+      if (at(0.8)) sfx.foley('bolt_down', 0.7);
     }
   }
 
@@ -393,10 +404,14 @@ export class GunCtl {
     const at = (k: number) => f0 < k && f1 >= k;
     const kind = this.def.kind;
     if (at(0.02) && (kind === 'pistol' || kind === 'revolver' || kind === 'shotgun')) sfx.spin();
-    if (kind === 'shotgun' && at(0.8)) sfx.clack();
-    if (kind === 'sniper' && (at(0.25) || at(0.7))) sfx.click(1);
+    if (kind === 'revolver' && at(0.4)) sfx.spin();
+    if (kind === 'shotgun' && at(0.74)) sfx.foley('pump_back', 0.6);
+    if (kind === 'shotgun' && at(0.88)) sfx.foley('pump_fwd', 0.6);
+    if (kind === 'sniper' && at(0.2)) sfx.foley('bolt_up', 0.5);
+    if (kind === 'sniper' && at(0.75)) sfx.foley('bolt_down', 0.5);
+    if (kind === 'smg' && at(0.4)) sfx.foley('smg_in', 0.4, 1.1);
     if (kind === 'minigun' && at(0.05)) sfx.spin();
-    if (kind === 'revolver' && at(0.92)) sfx.click(1.6);
+    if (kind === 'revolver' && at(0.92)) sfx.click(1.4);
   }
 
   /** compute the animated pose: local rotation, offsets, spin about a pivot, parts */

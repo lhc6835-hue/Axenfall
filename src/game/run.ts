@@ -485,13 +485,13 @@ export class Run {
       this.boss = this.spawn('warden');
       this.boss.hp = this.boss.max = 2200 * (1 + this.level * 0.03);
       this.hooks?.banner('보스 출현', '감시자 큐브', '#8adfff');
-      sfx.warn();
+      sfx.bossAppear();
     }
     if (!this.boss && !this.bossDone[1] && t >= BOSS2_AT) {
       this.boss = this.spawn('overlord');
       this.boss.hp = this.boss.max = 5600 * (1 + this.level * 0.03);
       this.hooks?.banner('최종 보스', '붉은 군주', '#ff6a80');
-      sfx.warn();
+      sfx.bossAppear();
     }
     if (this.swarms.length && t >= this.swarms[0]) {
       this.swarms.shift();
@@ -694,7 +694,7 @@ export class Run {
         } else {
           p.hp = Math.min(this.mods.maxHp, p.hp + d.v);
           this.fx.pop(p.x, p.y - 12, '+' + d.v, '#6aff9a', 1.2);
-          sfx.levelUp();
+          sfx.heal();
         }
       }
     }

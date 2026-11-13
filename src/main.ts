@@ -123,6 +123,8 @@ function startRun() {
   }, false, mouseWorld);
   banner = { text: '출격!', sub: '10분을 버티거나 최종 보스를 쓰러뜨려요', color: '#ffe46a', t: 2.4 };
   touchLayer.classList.toggle('on', isTouch);
+  sfx.music('battle');
+  sfx.runStart();
 }
 
 function finishRun(r: RunResult) {
@@ -135,8 +137,12 @@ function finishRun(r: RunResult) {
   restock();
   persist();
   touchLayer.classList.remove('on');
+  sfx.music(null);
+  if (r.won) sfx.victory();
+  else sfx.defeat();
   ui.result(r, bonus, () => {
     mode = 'lobby';
+    sfx.music('lobby');
     newDemo();
     ui.lobby();
   });
@@ -165,6 +171,8 @@ function frame(now: number) {
     run.camY = panelSide === 'right' ? 2 : -4;
   }
   if (banner) banner.t -= dt;
+  if (mode === 'play' && !run.over) sfx.music(run.boss ? (run.boss.type === 'overlord' ? 'boss2' : 'boss1') : 'battle');
+  sfx.update(dt);
 
   run.render(wctx);
   hctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -184,6 +192,8 @@ addEventListener('pointerdown', unlock);
 addEventListener('keydown', unlock);
 addEventListener('touchstart', unlock);
 sfx.setEnabled(save.sound);
+sfx.setMusic(save.music);
+sfx.music('lobby');
 
 document.fonts?.ready.then(() => undefined);
 newDemo();

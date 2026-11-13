@@ -1,34 +1,92 @@
-// Every sound is synthesised on the fly: filtered noise bursts and short oscillators.
+// Sample-based audio. Sound effects are decoded once into AudioBuffers and played
+// through Web Audio; background music streams through <audio> elements so it can
+// start before the whole file has downloaded. Credits: public/audio/CREDITS.md.
 
-type OscType = OscillatorType;
+const SFX = [
+  'shot_pistol', 'shot_revolver', 'shot_smg', 'shot_shotgun', 'shot_sniper', 'shot_minigun',
+  'mag_out', 'mag_in', 'slide', 'cyl_open', 'shell_in', 'cyl_close', 'cyl_spin',
+  'smg_out', 'smg_in', 'smg_bolt', 'pump_back', 'pump_fwd', 'shell_load',
+  'bolt_up', 'bolt_back', 'bolt_fwd', 'bolt_down', 'clip', 'box_out', 'box_in', 'belt',
+  'swing_s1', 'swing_s2', 'swing_s3', 'swing_m1', 'swing_m2', 'swing_m3', 'swing_h1', 'swing_h2',
+  'blade', 'parry', 'anvil', 'sheathe', 'hit1', 'hit2', 'hit3', 'hit_h1', 'hit_h2', 'hurt',
+  'casing1', 'casing2', 'ui', 'ui_back', 'deny', 'buy', 'coin', 'levelup', 'heal', 'victory', 'defeat',
+  'kill1', 'kill2', 'kill3', 'bhit1', 'bhit2', 'slam', 'slam2', 'eshot1', 'eshot2', 'rail', 'charge',
+  'reflect', 'gem1', 'gem2', 'dash', 'click', 'boss', 'start',
+] as const;
+export type SfxName = (typeof SFX)[number];
+export type Track = 'lobby' | 'battle' | 'boss1' | 'boss2';
+
+interface PlayOpts {
+  vol?: number;
+  rate?: number;
+  /** random +/- spread applied to rate */
+  jitter?: number;
+  delay?: number;
+  /** minimum ms between two plays of this name */
+  gate?: number;
+  /** maximum simultaneous voices of this name */
+  max?: number;
+}
+
+const BASE = 'audio/';
 
 class Sfx {
   ctx: AudioContext | null = null;
   master!: GainNode;
-  comp!: DynamicsCompressorNode;
-  noiseBuf!: AudioBuffer;
+  bufs = new Map<string, AudioBuffer>();
   enabled = true;
-  volume = 0.7;
+  musicOn = true;
+  volume = 0.8;
+  musicVolume = 0.45;
   private last = new Map<string, number>();
+  private voices = new Map<string, number>();
+  private loading = false;
+
+  // ---- music ----
+  private decks: HTMLAudioElement[] = [];
+  private live = 0;
+  private track: Track | null = null;
+  private duck = 1;
+  private duckT = 0;
+  private fade = 1;
 
   init() {
     if (this.ctx) {
       if (this.ctx.state === 'suspended') this.ctx.resume();
+      this.kickMusic();
       return;
     }
     const AC = window.AudioContext || (window as any).webkitAudioContext;
     if (!AC) return;
     this.ctx = new AC();
-    this.comp = this.ctx.createDynamicsCompressor();
-    this.comp.threshold.value = -14;
-    this.comp.ratio.value = 6;
+    const comp = this.ctx.createDynamicsCompressor();
+    comp.threshold.value = -10;
+    comp.ratio.value = 4;
+    comp.attack.value = 0.002;
+    comp.release.value = 0.12;
     this.master = this.ctx.createGain();
-    this.master.gain.value = this.volume;
-    this.master.connect(this.comp).connect(this.ctx.destination);
-    const len = this.ctx.sampleRate;
-    this.noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
-    const d = this.noiseBuf.getChannelData(0);
-    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    this.master.gain.value = this.enabled ? this.volume : 0;
+    this.master.connect(comp).connect(this.ctx.destination);
+    this.load();
+    this.kickMusic();
+  }
+
+  private async load() {
+    if (this.loading || !this.ctx) return;
+    this.loading = true;
+    const ctx = this.ctx;
+    await Promise.all(
+      SFX.map(async (n) => {
+        try {
+          const r = await fetch(`${BASE}sfx/${n}.mp3`);
+          if (!r.ok) return;
+          const b = await ctx.decodeAudioData(await r.arrayBuffer());
+          this.bufs.set(n, b);
+        } catch {
+          /* a missing clip just stays silent */
+        }
+      }),
+    );
   }
 
   setEnabled(on: boolean) {
@@ -36,209 +94,196 @@ class Sfx {
     if (this.master) this.master.gain.value = on ? this.volume : 0;
   }
 
-  /** limit how often a named sound may retrigger */
-  private gate(name: string, ms: number) {
+  setMusic(on: boolean) {
+    this.musicOn = on;
+    if (!on) for (const d of this.decks) d.pause();
+    else this.kickMusic();
+  }
+
+  play(name: SfxName | readonly SfxName[], o: PlayOpts = {}) {
+    if (!this.enabled || !this.ctx || this.ctx.state !== 'running') return;
+    const n = typeof name === 'string' ? name : name[Math.floor(Math.random() * name.length)];
+    const key = typeof name === 'string' ? name : name[0];
     const now = performance.now();
-    const l = this.last.get(name) ?? 0;
-    if (now - l < ms) return false;
-    this.last.set(name, now);
-    return true;
+    if (o.gate && now - (this.last.get(key) ?? -1e9) < o.gate) return;
+    if ((this.voices.get(key) ?? 0) >= (o.max ?? 6)) return;
+    const buf = this.bufs.get(n);
+    if (!buf) return;
+    this.last.set(key, now);
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    const j = o.jitter ?? 0.04;
+    src.playbackRate.value = (o.rate ?? 1) * (1 + (Math.random() * 2 - 1) * j);
+    const g = this.ctx.createGain();
+    g.gain.value = o.vol ?? 1;
+    src.connect(g).connect(this.master);
+    this.voices.set(key, (this.voices.get(key) ?? 0) + 1);
+    src.onended = () => this.voices.set(key, Math.max(0, (this.voices.get(key) ?? 1) - 1));
+    src.start(this.ctx.currentTime + (o.delay ?? 0));
   }
 
-  private ok() {
-    return this.enabled && this.ctx && this.ctx.state === 'running';
+  // ---------------- music ----------------
+  music(t: Track | null) {
+    if (t === this.track) return;
+    this.track = t;
+    if (!this.decks.length) {
+      for (let i = 0; i < 2; i++) {
+        const a = new Audio();
+        a.loop = true;
+        a.preload = 'auto';
+        a.volume = 0;
+        this.decks.push(a);
+      }
+    }
+    // crossfade: the old deck fades out in update(), the new one fades in
+    this.live = 1 - this.live;
+    const d = this.decks[this.live];
+    d.pause();
+    if (t) {
+      d.src = `${BASE}bgm/${t}.mp3`;
+      d.currentTime = 0;
+      d.volume = 0;
+      this.kickMusic();
+    }
+    this.fade = 0;
   }
 
-  noise(o: { dur: number; type?: BiquadFilterType; f0: number; f1?: number; q?: number; gain: number; attack?: number; delay?: number }) {
-    if (!this.ok()) return;
-    const c = this.ctx!, t = c.currentTime + (o.delay ?? 0);
-    const src = c.createBufferSource();
-    src.buffer = this.noiseBuf;
-    src.playbackRate.value = 0.8 + Math.random() * 0.4;
-    const f = c.createBiquadFilter();
-    f.type = o.type ?? 'bandpass';
-    f.frequency.setValueAtTime(o.f0, t);
-    if (o.f1) f.frequency.exponentialRampToValueAtTime(Math.max(20, o.f1), t + o.dur);
-    f.Q.value = o.q ?? 1;
-    const g = c.createGain();
-    const a = o.attack ?? 0.002;
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(o.gain, t + a);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + o.dur);
-    src.connect(f).connect(g).connect(this.master);
-    src.start(t, Math.random() * 0.5);
-    src.stop(t + o.dur + 0.05);
+  private kickMusic() {
+    if (!this.musicOn || !this.track) return;
+    const d = this.decks[this.live];
+    if (d && d.paused) d.play().catch(() => undefined);
   }
 
-  tone(o: { type?: OscType; f0: number; f1?: number; dur: number; gain: number; attack?: number; delay?: number; detune?: number }) {
-    if (!this.ok()) return;
-    const c = this.ctx!, t = c.currentTime + (o.delay ?? 0);
-    const osc = c.createOscillator();
-    osc.type = o.type ?? 'sine';
-    osc.frequency.setValueAtTime(o.f0, t);
-    if (o.f1) osc.frequency.exponentialRampToValueAtTime(Math.max(20, o.f1), t + o.dur);
-    if (o.detune) osc.detune.value = o.detune;
-    const g = c.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(o.gain, t + (o.attack ?? 0.003));
-    g.gain.exponentialRampToValueAtTime(0.0001, t + o.dur);
-    osc.connect(g).connect(this.master);
-    osc.start(t);
-    osc.stop(t + o.dur + 0.05);
+  /** briefly pull the music down under a big hit */
+  duckMusic(amount: number, time: number) {
+    this.duck = Math.min(this.duck, 1 - amount);
+    this.duckT = Math.max(this.duckT, time);
   }
 
-  // ---------- game sounds ----------
+  update(dt: number) {
+    if (!this.decks.length) return;
+    this.fade = Math.min(1, this.fade + dt / 0.9);
+    if (this.duckT > 0) this.duckT -= dt;
+    else this.duck = Math.min(1, this.duck + dt * 2.5);
+    const v = this.musicOn ? this.musicVolume * this.duck : 0;
+    const inD = this.decks[this.live], outD = this.decks[1 - this.live];
+    inD.volume = Math.max(0, Math.min(1, v * this.fade));
+    outD.volume = Math.max(0, Math.min(1, v * (1 - this.fade)));
+    if (this.fade >= 1 && !outD.paused) outD.pause();
+  }
+
+  // ---------------- game sounds ----------------
   shot(kind: string) {
-    if (!this.gate('shot', kind === 'smg' || kind === 'minigun' ? 45 : 20)) return;
     switch (kind) {
-      case 'pistol':
-        this.noise({ dur: 0.12, type: 'lowpass', f0: 5000, f1: 600, gain: 0.5 });
-        this.tone({ type: 'square', f0: 220, f1: 60, dur: 0.07, gain: 0.25 });
-        break;
-      case 'revolver':
-        this.noise({ dur: 0.22, type: 'lowpass', f0: 4000, f1: 300, gain: 0.7 });
-        this.tone({ type: 'sawtooth', f0: 160, f1: 40, dur: 0.12, gain: 0.35 });
-        break;
-      case 'smg':
-        this.noise({ dur: 0.07, type: 'bandpass', f0: 2600, f1: 900, q: 0.8, gain: 0.45 });
-        this.tone({ type: 'square', f0: 300, f1: 90, dur: 0.04, gain: 0.15 });
-        break;
-      case 'shotgun':
-        this.noise({ dur: 0.35, type: 'lowpass', f0: 3000, f1: 150, gain: 0.9 });
-        this.tone({ type: 'sawtooth', f0: 110, f1: 35, dur: 0.2, gain: 0.45 });
-        break;
-      case 'sniper':
-        this.noise({ dur: 0.45, type: 'lowpass', f0: 7000, f1: 200, gain: 0.9 });
-        this.tone({ type: 'sawtooth', f0: 140, f1: 30, dur: 0.3, gain: 0.5 });
-        this.noise({ dur: 0.6, type: 'bandpass', f0: 900, f1: 300, q: 2, gain: 0.15, delay: 0.05 });
-        break;
-      case 'minigun':
-        this.noise({ dur: 0.06, type: 'bandpass', f0: 1800, f1: 700, q: 1, gain: 0.4 });
-        this.tone({ type: 'square', f0: 180, f1: 70, dur: 0.035, gain: 0.12 });
-        break;
+      case 'pistol': return this.play('shot_pistol', { vol: 0.7, gate: 30 });
+      case 'revolver': return this.play('shot_revolver', { vol: 0.85, gate: 30 });
+      case 'smg': return this.play('shot_smg', { vol: 0.5, gate: 55, jitter: 0.08, max: 4 });
+      case 'shotgun': return this.play('shot_shotgun', { vol: 0.95, gate: 40 });
+      case 'sniper': return this.play('shot_sniper', { vol: 1, gate: 40 });
+      case 'minigun': return this.play('shot_minigun', { vol: 0.42, gate: 38, jitter: 0.1, max: 5 });
       case 'railgun':
-        this.tone({ type: 'sawtooth', f0: 1800, f1: 80, dur: 0.5, gain: 0.35 });
-        this.tone({ type: 'sine', f0: 90, f1: 30, dur: 0.5, gain: 0.6 });
-        this.noise({ dur: 0.5, type: 'highpass', f0: 3000, f1: 600, gain: 0.4 });
-        break;
+        this.play('rail', { vol: 1 });
+        this.play('slam', { vol: 0.45, rate: 1.4 });
+        return;
     }
   }
-
-  charge(dur: number) {
-    this.tone({ type: 'sine', f0: 300, f1: 1600, dur, gain: 0.12, attack: dur * 0.8 });
+  charge() {
+    this.play('charge', { vol: 0.6, jitter: 0 });
   }
-
+  /** named reload / action foley */
+  foley(n: SfxName, vol = 0.8, rate = 1) {
+    this.play(n, { vol, rate, gate: 25, jitter: 0.03 });
+  }
   click(pitch = 1) {
-    if (!this.gate('click' + pitch, 30)) return;
-    this.tone({ type: 'square', f0: 1400 * pitch, f1: 700 * pitch, dur: 0.03, gain: 0.12 });
-    this.noise({ dur: 0.03, type: 'highpass', f0: 4000, gain: 0.15 });
+    this.play('click', { vol: 0.5, rate: pitch, gate: 25 });
   }
   clack() {
-    this.tone({ type: 'square', f0: 500, f1: 250, dur: 0.05, gain: 0.15 });
-    this.noise({ dur: 0.06, type: 'bandpass', f0: 2500, q: 3, gain: 0.25 });
+    this.play('slide', { vol: 0.7, gate: 25 });
   }
   shell() {
-    if (!this.gate('shell', 40)) return;
-    this.tone({ type: 'triangle', f0: 3200 + Math.random() * 800, dur: 0.06, gain: 0.05 });
+    this.play(['casing1', 'casing2'], { vol: 0.35, gate: 45, jitter: 0.15, max: 4 });
   }
   spin() {
-    this.noise({ dur: 0.25, type: 'bandpass', f0: 600, f1: 1800, q: 4, gain: 0.08, attack: 0.05 });
+    this.play(['swing_s1', 'swing_s2', 'swing_s3'], { vol: 0.35, rate: 1.5, gate: 60 });
   }
-
   swing(kind: string) {
-    const heavy = kind === 'greatsword' || kind === 'scythe';
-    const quick = kind === 'dagger' || kind === 'rapier';
-    this.noise({
-      dur: heavy ? 0.3 : quick ? 0.1 : 0.18,
-      type: 'bandpass',
-      f0: heavy ? 500 : quick ? 2500 : 1200,
-      f1: heavy ? 1500 : quick ? 5000 : 3500,
-      q: 1.5,
-      gain: heavy ? 0.4 : 0.28,
-      attack: 0.02,
-    });
-    if (kind === 'katana') this.tone({ type: 'sine', f0: 3200, f1: 2600, dur: 0.25, gain: 0.05 });
+    if (kind === 'greatsword' || kind === 'scythe') this.play(['swing_h1', 'swing_h2'], { vol: 0.9, rate: kind === 'scythe' ? 1.15 : 0.9 });
+    else if (kind === 'longsword' || kind === 'katana') this.play(['swing_m1', 'swing_m2', 'swing_m3'], { vol: 0.85, rate: kind === 'katana' ? 1.15 : 1 });
+    else this.play(['swing_s1', 'swing_s2', 'swing_s3'], { vol: 0.8, rate: kind === 'rapier' ? 1.3 : 1.15 });
+    if (kind === 'katana') this.play('blade', { vol: 0.35, rate: 1.2 });
   }
   sheathe() {
-    this.tone({ type: 'square', f0: 2200, f1: 1800, dur: 0.04, gain: 0.12 });
-    this.tone({ type: 'sine', f0: 4200, dur: 0.15, gain: 0.04, delay: 0.01 });
+    this.play('sheathe', { vol: 0.5, rate: 1.8 });
+    this.play('click', { vol: 0.6, rate: 1.3, delay: 0.06 });
   }
-
   slashHit(heavy = false) {
-    if (!this.gate('slashhit', 30)) return;
-    this.noise({ dur: heavy ? 0.25 : 0.12, type: 'lowpass', f0: heavy ? 1800 : 3500, f1: 200, gain: heavy ? 0.7 : 0.45 });
-    this.tone({ type: 'sine', f0: heavy ? 120 : 200, f1: 50, dur: heavy ? 0.18 : 0.08, gain: 0.4 });
+    if (heavy) this.play(['hit_h1', 'hit_h2'], { vol: 0.9, gate: 30, max: 3 });
+    else this.play(['hit1', 'hit2', 'hit3'], { vol: 0.7, gate: 30, max: 3 });
   }
-
   bulletHit() {
-    if (!this.gate('bhit', 35)) return;
-    this.noise({ dur: 0.05, type: 'bandpass', f0: 1500, q: 1.2, gain: 0.18 });
+    this.play(['bhit1', 'bhit2'], { vol: 0.6, gate: 35, jitter: 0.15, max: 3 });
   }
-
   kill() {
-    if (!this.gate('kill', 40)) return;
-    this.noise({ dur: 0.18, type: 'lowpass', f0: 2500, f1: 200, gain: 0.3 });
-    this.tone({ type: 'square', f0: 140, f1: 45, dur: 0.12, gain: 0.18 });
+    this.play(['kill1', 'kill2', 'kill3'], { vol: 0.55, gate: 40, jitter: 0.12, max: 4 });
   }
-
   parry(perfect: boolean) {
-    // metallic clang: several inharmonic partials with fast decay plus a crack of noise
-    const base = perfect ? 1250 : 1050;
-    for (const [m, g] of [[1, 0.28], [2.76, 0.16], [5.4, 0.1], [8.93, 0.06]] as const)
-      this.tone({ type: 'sine', f0: base * m, f1: base * m * 0.985, dur: perfect ? 0.9 : 0.55, gain: g });
-    this.tone({ type: 'triangle', f0: base * 0.5, dur: 0.3, gain: 0.2 });
-    this.noise({ dur: 0.08, type: 'highpass', f0: 3000, gain: 0.6 });
-    this.tone({ type: 'sine', f0: 140, f1: 40, dur: 0.25, gain: 0.6 });
-    if (perfect) this.tone({ type: 'sine', f0: base * 2, f1: base * 2.02, dur: 1.2, gain: 0.06, delay: 0.05 });
+    this.play('parry', { vol: 1, rate: perfect ? 1.12 : 1, jitter: 0.02, gate: 40 });
+    if (perfect) this.play('anvil', { vol: 0.55, rate: 1.25, jitter: 0 });
+    this.duckMusic(perfect ? 0.6 : 0.35, perfect ? 0.35 : 0.15);
   }
-
   reflect() {
-    this.tone({ type: 'square', f0: 900, f1: 1800, dur: 0.08, gain: 0.08 });
+    this.play('reflect', { vol: 0.45, gate: 50 });
   }
-
   hurt() {
-    this.noise({ dur: 0.2, type: 'lowpass', f0: 1200, f1: 100, gain: 0.6 });
-    this.tone({ type: 'sawtooth', f0: 180, f1: 60, dur: 0.2, gain: 0.3 });
+    this.play('hurt', { vol: 0.9, gate: 80 });
+    this.duckMusic(0.3, 0.12);
   }
-
   dash() {
-    this.noise({ dur: 0.18, type: 'bandpass', f0: 800, f1: 2400, q: 1, gain: 0.25, attack: 0.02 });
+    this.play('dash', { vol: 0.6, rate: 1.1 });
   }
-
   gem() {
-    if (!this.gate('gem', 25)) return;
-    this.tone({ type: 'sine', f0: 1300 + Math.random() * 300, f1: 1900, dur: 0.06, gain: 0.06 });
+    this.play(['gem1', 'gem2'], { vol: 0.35, gate: 30, jitter: 0.12, max: 3 });
   }
   coin() {
-    if (!this.gate('coin', 40)) return;
-    this.tone({ type: 'square', f0: 1568, dur: 0.05, gain: 0.06 });
-    this.tone({ type: 'square', f0: 2093, dur: 0.12, gain: 0.06, delay: 0.05 });
+    this.play('coin', { vol: 0.45, gate: 45, jitter: 0.1, max: 3 });
   }
   levelUp() {
-    [523, 659, 784, 1047].forEach((f, i) => this.tone({ type: 'square', f0: f, dur: 0.14, gain: 0.08, delay: i * 0.07 }));
+    this.play('levelup', { vol: 0.7, jitter: 0 });
+  }
+  heal() {
+    this.play('heal', { vol: 0.6, jitter: 0 });
+  }
+  bossAppear() {
+    this.play('boss', { vol: 0.75, jitter: 0 });
+    this.duckMusic(0.7, 2.5);
+  }
+  runStart() {
+    this.play('start', { vol: 0.5, jitter: 0 });
   }
   warn() {
-    this.tone({ type: 'sawtooth', f0: 220, dur: 0.5, gain: 0.15 });
-    this.tone({ type: 'sawtooth', f0: 233, dur: 0.5, gain: 0.15 });
+    this.play('charge', { vol: 0.5, rate: 0.6, jitter: 0, gate: 200 });
   }
   enemyShot() {
-    if (!this.gate('eshot', 60)) return;
-    this.tone({ type: 'triangle', f0: 600, f1: 300, dur: 0.08, gain: 0.07 });
+    this.play(['eshot1', 'eshot2'], { vol: 0.35, gate: 70, max: 3 });
   }
   slam() {
-    this.noise({ dur: 0.4, type: 'lowpass', f0: 800, f1: 60, gain: 0.8 });
-    this.tone({ type: 'sine', f0: 90, f1: 30, dur: 0.35, gain: 0.6 });
+    this.play('slam', { vol: 0.8, gate: 60, max: 2 });
+    this.play('slam2', { vol: 0.6, gate: 60, max: 2 });
   }
   ui() {
-    this.tone({ type: 'square', f0: 880, dur: 0.04, gain: 0.05 });
+    this.play('ui', { vol: 0.5, jitter: 0, gate: 40 });
   }
   buy() {
-    [784, 1175, 1568].forEach((f, i) => this.tone({ type: 'triangle', f0: f, dur: 0.12, gain: 0.1, delay: i * 0.05 }));
-    this.noise({ dur: 0.15, type: 'highpass', f0: 5000, gain: 0.08, delay: 0.1 });
+    this.play('buy', { vol: 0.7, jitter: 0 });
   }
   deny() {
-    this.tone({ type: 'square', f0: 180, dur: 0.12, gain: 0.08 });
-    this.tone({ type: 'square', f0: 140, dur: 0.15, gain: 0.08, delay: 0.08 });
+    this.play('deny', { vol: 0.6, jitter: 0, gate: 120 });
+  }
+  victory() {
+    this.play('victory', { vol: 0.8, jitter: 0 });
+  }
+  defeat() {
+    this.play('defeat', { vol: 0.8, jitter: 0 });
   }
 }
 

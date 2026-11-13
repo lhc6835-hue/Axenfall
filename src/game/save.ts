@@ -18,6 +18,7 @@ export interface Save {
   best: { time: number; kills: number; level: number };
   runs: number;
   sound: boolean;
+  music: boolean;
 }
 
 const KEY = 'parrycube_save_v1';
@@ -35,6 +36,7 @@ function fresh(): Save {
     best: { time: 0, kills: 0, level: 0 },
     runs: 0,
     sound: true,
+    music: true,
   };
   restock(s);
   return s;
