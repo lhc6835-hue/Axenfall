@@ -146,7 +146,10 @@ export class Enemy {
         }
         this.face = toP;
         const inRange = this.type === 'dasher' ? d < s.range && d > 30 : ranged ? d < s.range + 40 : d < s.range + 4;
-        if (inRange && this.cd <= 0) {
+        // wait your turn: only a few enemies may attack at once, and ranged ones hold fire while the sky is busy
+        const crowded = run.attackers() >= run.attackCap() || (ranged && run.hostileShots() >= run.shotCap() - 2);
+        if (inRange && this.cd <= 0 && crowded) this.cd = rand(0.3, 0.7);
+        else if (inRange && this.cd <= 0) {
           this.state = 'windup';
           this.t = 0;
           this.atk = toP;
@@ -209,7 +212,7 @@ export class Enemy {
         if (this.t >= this.sub) {
           this.state = 'chase';
           this.t = 0;
-          this.cd = this.type === 'archer' ? rand(1.8, 2.8) : this.type === 'caster' ? rand(2.6, 3.6) : rand(0.6, 1.3);
+          this.cd = this.type === 'archer' ? rand(3.2, 4.6) : this.type === 'caster' ? rand(4.5, 6) : rand(1.0, 1.8);
         }
         break;
       default:
@@ -234,7 +237,7 @@ export class Enemy {
         break;
       }
       case 'caster': {
-        const n = this.elite ? 7 : 5;
+        const n = this.elite ? 5 : 3;
         for (let i = 0; i < n; i++) {
           const a = this.atk + (i / (n - 1) - 0.5) * 1.1;
           run.enemyShot(this.x, this.y, Math.cos(a) * 95, Math.sin(a) * 95, this.dmg, 2.5, s.color);
@@ -301,9 +304,9 @@ export class Enemy {
       case 'strike': {
         if (this.pattern === 0) {
           // bullet rings, each one offset
-          const waves = enraged ? 4 : 3;
+          const waves = enraged ? 3 : 2;
           if (this.t >= this.sub * 0.32 && this.sub < waves) {
-            const n = final ? 18 : 14;
+            const n = final ? 12 : 10;
             for (let i = 0; i < n; i++) {
               const a = (i / n) * TAU + this.sub * 0.21;
               run.enemyShot(this.x, this.y, Math.cos(a) * 80, Math.sin(a) * 80, this.dmg * 0.5, 3, s.color);
@@ -325,9 +328,9 @@ export class Enemy {
           if (this.t > 0.6) this.toRecover(0.9);
         } else if (this.pattern === 3) {
           // spiral stream
-          if (this.t >= this.sub * 0.06 && this.t < 2.2) {
-            for (let k = 0; k < 3; k++) {
-              const a = this.sub * 0.33 + (k * TAU) / 3;
+          if (this.t >= this.sub * 0.12 && this.t < 2.2) {
+            for (let k = 0; k < 2; k++) {
+              const a = this.sub * 0.33 + (k * TAU) / 2;
               run.enemyShot(this.x, this.y, Math.cos(a) * 85, Math.sin(a) * 85, this.dmg * 0.45, 2.5, 0xff8aa0);
             }
             if (this.sub % 3 === 0) sfx.enemyShot();

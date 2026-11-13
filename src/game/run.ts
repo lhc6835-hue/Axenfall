@@ -95,7 +95,7 @@ export class Run {
   bossDone = [false, false];
   spawnAcc = 0;
   eliteT = 55;
-  swarms = [150, 330, 420];
+  swarms = [180, 400];
   parries = 0;
   perfects = 0;
   demoT = 0;
@@ -212,9 +212,11 @@ export class Run {
     if (e.boss || e.type === 'brute') fx.ring(e.x, e.y, e.r, e.r * 3, 0.35, c, 3);
     sfx.kill();
     // drops
-    const xp = e.spec.xp * (e.elite ? 5 : 1);
+    // fewer, meaner enemies: each one is worth more
+    const bounty = e.boss ? 1 : 2;
+    const xp = e.spec.xp * (e.elite ? 5 : 1) * bounty;
     if (xp > 0) this.drop(e.x, e.y, 'xp', xp);
-    const gc = e.spec.gold * (e.elite ? 12 : 1);
+    const gc = e.spec.gold * (e.elite ? 12 : 1) * bounty;
     let goldN = Math.floor(gc) + (Math.random() < gc % 1 ? 1 : 0);
     if (goldN > 0) {
       const pieces = Math.min(goldN, e.boss ? 30 : 6);
@@ -289,7 +291,7 @@ export class Run {
       fx.spawn(PK.Star, x + rand(-10, 10), y + rand(-10, 10), rand(-20, 20), rand(-30, 0), rand(0.3, 0.6), 0xffe46a, { s: rand(1, 3) });
     fx.light(x, y, perfect ? 110 : 70, 0xffe0a0, perfect ? 1.5 : 1, perfect ? 0.35 : 0.22);
     this.hitstop(perfect ? 0.2 : 0.12);
-    if (perfect) this.slowmo(0.45, 0.3);
+    this.slowmo(perfect ? 0.5 : 0.28, perfect ? 0.3 : 0.5);
     this.flash(perfect ? 0.55 : 0.3, perfect ? 0xfff4d0 : 0xffffff);
     this.shake(perfect ? 8 : 5);
     this.g.mono = perfect ? 0.6 : 0.3;
@@ -372,8 +374,27 @@ export class Run {
     }
   }
 
+  hostileShots() {
+    let n = 0;
+    for (const s of this.shots) if (!s.friendly) n++;
+    return n;
+  }
+  /** how many enemy bullets may be in the air at once */
+  shotCap() {
+    return this.boss ? 30 : 8 + Math.floor(this.time / 60);
+  }
+  /** enemies currently winding up or striking: limits the pile-on so every attack is readable */
+  attackers() {
+    let n = 0;
+    for (const e of this.enemies) if (!e.dead && !e.boss && (e.state === 'windup' || e.state === 'strike')) n++;
+    return n;
+  }
+  attackCap() {
+    return 2 + Math.floor(this.time / 150);
+  }
+
   enemyShot(x: number, y: number, vx: number, vy: number, dmg: number, r: number, c: number) {
-    if (this.shots.length > 500) return;
+    if (this.hostileShots() >= this.shotCap()) return;
     this.shots.push({ x, y, vx, vy, r, dmg, life: 4.5, friendly: false, c, pierce: 0, hit: null, px: x, py: y });
   }
 
@@ -474,7 +495,7 @@ export class Run {
     }
     if (this.swarms.length && t >= this.swarms[0]) {
       this.swarms.shift();
-      const n = 26;
+      const n = 14;
       const R = 150;
       for (let i = 0; i < n; i++) {
         const a = (i / n) * TAU;
@@ -484,14 +505,14 @@ export class Run {
     }
     this.eliteT -= dt;
     if (this.eliteT <= 0) {
-      this.eliteT = rand(35, 50);
+      this.eliteT = rand(50, 70);
       const types: EType[] = t > 200 ? ['brute', 'dasher', 'caster', 'archer'] : t > 100 ? ['dasher', 'archer', 'grunt'] : ['grunt', 'runner'];
       this.spawn(types[Math.floor(Math.random() * types.length)], true);
     }
     const alive = this.enemies.length;
-    const cap = 70 + t * 0.4;
+    const cap = 22 + t * 0.11;
     if (alive > cap) return;
-    const rate = (1.5 + t / 20) * (this.boss ? 0.45 : 1);
+    const rate = (0.75 + t / 50) * (this.boss ? 0.35 : 1);
     this.spawnAcc += rate * dt;
     while (this.spawnAcc >= 1) {
       this.spawnAcc--;
@@ -504,10 +525,10 @@ export class Run {
     const w: [EType, number][] = [
       ['grunt', 10],
       ['runner', t > 20 ? 6 : 0],
-      ['archer', t > 45 ? 3.5 + t / 120 : 0],
-      ['dasher', t > 90 ? 2.5 + t / 150 : 0],
-      ['brute', t > 130 ? 1 + t / 200 : 0],
-      ['caster', t > 190 ? 1.5 + t / 200 : 0],
+      ['archer', t > 50 ? 2 + t / 200 : 0],
+      ['dasher', t > 90 ? 2 + t / 200 : 0],
+      ['brute', t > 130 ? 0.8 + t / 300 : 0],
+      ['caster', t > 200 ? 0.8 + t / 300 : 0],
     ];
     let total = 0;
     for (const [, v] of w) total += v;
