@@ -228,3 +228,8 @@ button { font-family: inherit; cursor: pointer; }
 #wipe .wp.b { clip-path: polygon(0 64%, 100% 36%, 100% 100%, 0 100%); }
 #wipe svg { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; }
 #wipe svg line { stroke: #d8d2ff; stroke-width: 1.5px; }
+
+.vol { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--ink); padding: 4px 2px; }
+.vol span { min-width: 72px; text-align: left; color: var(--dim); }
+.vol input { flex: 1; accent-color: #ffd23a; }
+.vol b { min-width: 28px; text-align: right; font-weight: normal; color: #ffe08a; }

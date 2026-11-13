@@ -218,6 +218,8 @@ onFullscreenChange((on) => {
     ui.pause();
   }
 });
+sfx.setVolume(save.sfxVol);
+sfx.setMusicVolume(save.musicVol);
 sfx.setEnabled(save.sound);
 sfx.setMusic(save.music);
 sfx.music('lobby');

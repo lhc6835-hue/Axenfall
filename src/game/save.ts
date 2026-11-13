@@ -20,6 +20,8 @@ export interface Save {
   sound: boolean;
   music: boolean;
   fullscreen: boolean;
+  sfxVol: number;
+  musicVol: number;
 }
 
 const KEY = 'parrycube_save_v1';
@@ -39,6 +41,8 @@ function fresh(): Save {
     sound: true,
     music: true,
     fullscreen: true,
+    sfxVol: 0.8,
+    musicVol: 0.45,
   };
   restock(s);
   return s;

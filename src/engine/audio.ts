@@ -92,6 +92,13 @@ class Sfx {
     );
   }
 
+  setVolume(v: number) {
+    this.volume = Math.max(0, Math.min(1, v));
+    if (this.master) this.master.gain.value = this.enabled ? this.volume : 0;
+  }
+  setMusicVolume(v: number) {
+    this.musicVolume = Math.max(0, Math.min(1, v));
+  }
   setEnabled(on: boolean) {
     this.enabled = on;
     if (this.master) this.master.gain.value = on ? this.volume : 0;
@@ -255,7 +262,7 @@ class Sfx {
     if (kind === 'katana') this.play('blade', { vol: 0.35, rate: 1.2 });
   }
   sheathe() {
-    this.play('sheathe', { vol: 0.5, rate: 1.8 });
+    this.play('sheathe', { vol: 0.32, rate: 1.25 });
     this.play('click', { vol: 0.6, rate: 1.3, delay: 0.06 });
   }
   slashHit(heavy = false) {
@@ -268,10 +275,12 @@ class Sfx {
   kill() {
     this.play(['kill1', 'kill2', 'kill3'], { vol: 0.55, gate: 40, jitter: 0.12, max: 4 });
   }
-  parry(perfect: boolean) {
-    // bright blade ring; PERFECT gets its own higher, longer ring
-    if (perfect) this.play('parry_perfect', { vol: 1, jitter: 0.015, gate: 40 });
-    else this.play('parry', { vol: 0.95, jitter: 0.03, gate: 40 });
+  /** `soft`: a reflected bullet, quieter so a volley of them doesn't pile up */
+  parry(perfect: boolean, soft = false) {
+    // clean blade ring, sat just above the gunshots; PERFECT rings longer rather than brighter
+    const g = soft ? 0.6 : 1;
+    if (perfect) this.play('parry_perfect', { vol: 0.75 * g, jitter: 0.015, gate: soft ? 110 : 60, max: 2 });
+    else this.play('parry', { vol: 0.66 * g, jitter: 0.03, gate: soft ? 110 : 60, max: 2 });
     this.duckMusic(perfect ? 0.6 : 0.35, perfect ? 0.35 : 0.15);
   }
   reflect() {

@@ -113,6 +113,28 @@ function defOf(cat: ShopCat, id: string): GunDef | SwordDef | SkinDef {
   return cat === 'gun' ? gunById(id) : cat === 'sword' ? swordById(id) : skinById(id);
 }
 
+function bindVolume(m: HTMLElement) {
+  m.querySelectorAll<HTMLInputElement>('input[data-v]').forEach((inp) => {
+    const out = inp.parentElement!.querySelector('b')!;
+    inp.oninput = () => {
+      const v = Number(inp.value) / 100;
+      out.textContent = inp.value;
+      if (inp.dataset.v === 'sfx') {
+        save.sfxVol = v;
+        sfx.setVolume(v);
+      } else {
+        save.musicVol = v;
+        sfx.setMusicVolume(v);
+      }
+    };
+    // play a sample parry at the new level so the change can be heard
+    inp.onchange = () => {
+      persist();
+      if (inp.dataset.v === 'sfx') sfx.parry(false);
+    };
+  });
+}
+
 // =====================================================================
 export class UI {
   shopTab: ShopCat = 'gun';
@@ -183,6 +205,8 @@ export class UI {
       <h2>설정</h2>
       <button class="btn" data-a="snd">효과음: ${save.sound ? '켜짐' : '꺼짐'}</button>
       <button class="btn" data-a="bgm">배경음: ${save.music ? '켜짐' : '꺼짐'}</button>
+      <label class="vol"><span>효과음 크기</span><input type="range" min="0" max="100" step="5" data-v="sfx" value="${Math.round(save.sfxVol * 100)}"><b>${Math.round(save.sfxVol * 100)}</b></label>
+      <label class="vol"><span>배경음 크기</span><input type="range" min="0" max="100" step="5" data-v="music" value="${Math.round(save.musicVol * 100)}"><b>${Math.round(save.musicVol * 100)}</b></label>
       ${canFullscreen() ? `<button class="btn" data-a="fs">전체화면: ${save.fullscreen ? '자동' : '끔'}</button>` : ''}
       <button class="btn ghost danger" data-a="reset">저장 데이터 초기화</button>
       <button class="btn" data-a="close">닫기</button>
@@ -201,6 +225,7 @@ export class UI {
       persist();
       (e.target as HTMLElement).textContent = `배경음: ${save.music ? '켜짐' : '꺼짐'}`;
     };
+    bindVolume(m);
     const fsBtn = m.querySelector<HTMLElement>('[data-a=fs]');
     if (fsBtn)
       fsBtn.onclick = (e) => {
@@ -433,6 +458,8 @@ export class UI {
       <button class="btn primary" data-a="resume">계속하기</button>
       <button class="btn" data-a="snd">효과음: ${save.sound ? '켜짐' : '꺼짐'}</button>
       <button class="btn" data-a="bgm">배경음: ${save.music ? '켜짐' : '꺼짐'}</button>
+      <label class="vol"><span>효과음 크기</span><input type="range" min="0" max="100" step="5" data-v="sfx" value="${Math.round(save.sfxVol * 100)}"><b>${Math.round(save.sfxVol * 100)}</b></label>
+      <label class="vol"><span>배경음 크기</span><input type="range" min="0" max="100" step="5" data-v="music" value="${Math.round(save.musicVol * 100)}"><b>${Math.round(save.musicVol * 100)}</b></label>
       ${canFullscreen() ? `<button class="btn" data-a="fs">전체화면: ${save.fullscreen ? '자동' : '끔'}</button>` : ''}
       <button class="btn ghost danger" data-a="quit">포기하고 로비로 (모은 골드는 받아요)</button>
     </div>`;
@@ -449,6 +476,7 @@ export class UI {
       persist();
       (e.target as HTMLElement).textContent = `배경음: ${save.music ? '켜짐' : '꺼짐'}`;
     };
+    bindVolume(m);
     const fsBtn = m.querySelector<HTMLElement>('[data-a=fs]');
     if (fsBtn)
       fsBtn.onclick = (e) => {

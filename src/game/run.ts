@@ -357,7 +357,7 @@ export class Run {
     this.shake(perfect ? 4 : 2);
     sfx.reflect();
     if (perfect) {
-      sfx.parry(true);
+      sfx.parry(true, true);
       this.flash(0.25, 0xfff4d0);
       this.g.mono = 0.4;
       this.afterParry(true, this.player.x, this.player.y);
@@ -366,7 +366,7 @@ export class Run {
         fx.pop(s.x, s.y - 8, 'PERFECT!', '#ffe46a', 1.6, true);
       }
     } else {
-      sfx.parry(false);
+      sfx.parry(false, true);
       if (this.clock - this.lastParryText > 0.25) {
         this.lastParryText = this.clock;
         fx.pop(s.x, s.y - 8, '반사!', '#8ff3ff', 1.1, true);
