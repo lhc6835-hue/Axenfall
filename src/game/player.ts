@@ -184,6 +184,48 @@ export class Player {
     this.tilt -= 0.28 * k * (ca >= 0 ? 1 : -1);
   }
 
+  /** squash (amt > 0) or stretch (amt < 0) the cube along direction a, bulging the other way */
+  private squashAlong(a: number, amt: number) {
+    const ca = Math.abs(Math.cos(a)), sa = Math.abs(Math.sin(a));
+    this.sx = clamp(this.sx - amt * ca + amt * 0.5 * sa, 0.6, 1.45);
+    this.sy = clamp(this.sy - amt * sa + amt * 0.5 * ca, 0.6, 1.45);
+  }
+
+  /** the cut leaves: the body twists with the blade and stretches into it */
+  swingFeel(a: number, side: number, heavy: boolean, fin: boolean) {
+    if (this.dead) return;
+    const k = (heavy ? 1.4 : 1) * (fin ? 1.3 : 1);
+    this.tilt += side * 0.2 * k;
+    this.squashAlong(a, -0.16 * k);
+    this.run.camKick(a + Math.PI, 0.9 * k);
+  }
+
+  /** the blade bites: a short jolt back from the contact */
+  slashImpact(a: number, heavy: boolean) {
+    if (this.dead) return;
+    const push = heavy ? 55 : 30;
+    if (this.dashT <= 0) {
+      this.vx -= Math.cos(a) * push;
+      this.vy -= Math.sin(a) * push;
+    }
+    this.squashAlong(a, heavy ? 0.2 : 0.12);
+    this.run.camKick(a + Math.PI, heavy ? 1.6 : 0.8);
+  }
+
+  /** a blow is turned aside: the cube is driven back, braced against it, and rocked */
+  parryJolt(threat: number, perfect: boolean, force: number) {
+    if (this.dead) return;
+    // a perfect parry is clean: less of the blow gets through
+    const push = (perfect ? 95 : 150) * force;
+    if (this.dashT <= 0) {
+      this.vx -= Math.cos(threat) * push;
+      this.vy -= Math.sin(threat) * push;
+    }
+    this.squashAlong(threat, (perfect ? 0.24 : 0.3) * Math.min(1.3, force));
+    this.tilt -= (Math.cos(threat) >= 0 ? 1 : -1) * (perfect ? 0.22 : 0.32) * Math.min(1.3, force);
+    this.run.camKick(threat, (perfect ? 2.5 : 3.5) * force);
+  }
+
   /** aim helper used by the lobby demo */
   faceToward(a: number, dt: number) {
     this.swordAim += angDiff(this.swordAim, a) * Math.min(1, dt * 8);

@@ -1393,6 +1393,7 @@ export class SwordCtl {
           this.lunge = mv.lunge ?? (k === 'spear' ? 1.3 : k === 'rapier' ? 1 : mo === 'jabs' ? 0.5 : HEAVY[k] ? 0.6 : 0.35);
           if (mv.hop === 1) this.hop = 1;
           if (mo === 'whip') this.resetChain();
+          if (this.run.player) this.run.player.swingFeel(this.aim, this.side, !!HEAVY[k], !!mv.fin);
         }
         break;
       }
@@ -1715,6 +1716,7 @@ export class SwordCtl {
     sfx.slashHit(heavy);
     if (!this.hitStopDone) {
       this.hitStopDone = true;
+      this.run.player?.slashImpact(Math.atan2(ny, nx), heavy);
       this.run.hitstop(def.stop * (fin ? 1.5 : 1));
       this.run.shake(heavy ? 5 : 2.5);
     } else this.run.hitstop(0.008);

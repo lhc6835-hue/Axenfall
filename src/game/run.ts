@@ -375,6 +375,7 @@ export class Run {
     this.damageEnemy(e, dmg, 0, 0, perfect, 'parry');
     this.parryFx(cx, cy, a, perfect);
     s.deflect(a, perfect);
+    p.parryJolt(a, perfect, e.boss ? 1.3 : e.type === 'brute' ? 1.15 : 1);
     this.afterParry(perfect, p.x, p.y);
   }
 
@@ -447,7 +448,10 @@ export class Run {
     this.parries++;
     if (perfect) this.perfects++;
     // bullets only pull the blade into a guard when it isn't mid-cut
-    this.player.sword.deflect(Math.atan2(s.y - this.player.y, s.x - this.player.x), perfect, false);
+    const from = Math.atan2(s.y - this.player.y, s.x - this.player.x);
+    this.player.sword.deflect(from, perfect, false);
+    // a bullet is light: just a nudge
+    this.player.parryJolt(from, perfect, 0.35);
     const fx = this.fx;
     fx.flare(s.x, s.y, perfect ? 9 : 6, s.c, 0.08);
     fx.sparks(s.x, s.y, a, 0.8, perfect ? 12 : 7, 200, s.c, 0xffffff, 0.25);
@@ -881,6 +885,7 @@ export class Run {
         const cx = p.x + Math.cos(a) * 8, cy = p.y + Math.sin(a) * 8;
         this.parryFx(cx, cy, a, perfect);
         s.deflect(a, perfect);
+        p.parryJolt(a, perfect, 1.2);
         this.afterParry(perfect, p.x, p.y);
       } else this.hurtPlayer(w.dmg, a);
     }
