@@ -358,6 +358,8 @@ export class UI {
   // ---------------- shop ----------------
   shop(tab: ShopCat = this.shopTab) {
     checkTimedRestock();
+    const prev = this.current === 'shop' ? document.querySelector<HTMLElement>('.panel') : null;
+    const keepScroll = prev && tab === this.shopTab ? prev.scrollTop : 0;
     this.clear();
     this.current = 'shop';
     this.shopTab = tab;
@@ -411,6 +413,11 @@ export class UI {
     this.restockTimer = window.setInterval(upd, 1000);
     w.appendChild(p);
     root().appendChild(w);
+    if (prev) {
+      // redrawn in place (a purchase, a reroll): no slide-in, same scroll position
+      p.style.animation = 'none';
+      p.scrollTop = keepScroll;
+    }
   }
 
   shopCard(cat: ShopCat, slot: Slot) {
@@ -509,7 +516,13 @@ export class UI {
             else save.eq.skin = d.id;
             persist();
             this.app.refreshDemo();
-            this.loadout();
+            // mark the new pick in place: the list stays where it was scrolled
+            list.querySelectorAll<HTMLElement>('.row.eq').forEach((r) => {
+              r.classList.remove('eq');
+              r.querySelector('.eqmark')!.textContent = '장착';
+            });
+            row.classList.add('eq');
+            row.querySelector('.eqmark')!.textContent = '장착 중';
           };
         list.appendChild(row);
       }
