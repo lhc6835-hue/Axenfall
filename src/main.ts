@@ -198,9 +198,12 @@ function frame(now: number) {
     if (!paused) run.update(dt);
     else input.clearPresses();
   } else {
-    // the lobby cube takes the slash button (parry practice); everything else is ignored
+    // the lobby cube takes the slash button (parry practice) exactly as a run does: a press made
+    // during a hit-stop is kept until the world moves again. Every other button is ignored here.
     run.update(dt);
-    input.clearPresses();
+    input.take('dash');
+    input.take('reload');
+    input.take('pause');
     // keep the showcase cube in the free part of the screen
     const off = panelSide === 'right' ? W * 0.27 : 0;
     run.camX = off;
