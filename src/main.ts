@@ -3,7 +3,7 @@ import { Input, isTyping } from './engine/input';
 import { cloud, initCloud } from './net/cloud';
 import { sfx } from './engine/audio';
 import { clamp } from './engine/math';
-import { gunById, skinById, swordById, type GunDef, type SkinDef, type SwordDef } from './game/data';
+import { SWORDS, gunById, skinById, swordById, type GunDef, type SkinDef, type SwordDef } from './game/data';
 import { persist, restock, save } from './game/save';
 import { Run, type Loadout, type RunResult } from './game/run';
 import { drawHud, type Banner } from './ui/hud';
@@ -220,7 +220,10 @@ function frame(now: number) {
   hctx.setTransform(hs * dpr, 0, 0, hs * dpr, 0, 0);
   drawHud(hctx, run, (W * scale) / hs, HUD_H, scale / hs, mode === 'play' ? banner : null, mode === 'play');
   tickPreviews(dt);
-  if (import.meta.env.DEV) (window as any).__run = run;
+  if (import.meta.env.DEV) {
+    (window as any).__run = run;
+    (window as any).__swords = SWORDS;
+  }
   requestAnimationFrame(frame);
 }
 

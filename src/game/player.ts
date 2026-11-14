@@ -138,6 +138,7 @@ export class Player {
     if (input && input.take('reload')) this.gun.startReload();
 
     const ax = this.x + this.carryX, ay = this.y + this.carryY;
+    this.sword.bodyAim = this.dead ? null : this.gun.aim;
     this.sword.hx0 = ax;
     this.sword.hy0 = ay;
     this.sword.update(dt, ax, ay, aim, time);
@@ -176,10 +177,10 @@ export class Player {
     const sk = this.sword.def.kind;
     const inHand = sk === 'dagger' || sk === 'rapier' || sk === 'longsword' || sk === 'saber' || sk === 'katar' || sk === 'cleaver' || sk === 'spear' || sk === 'twinblade' || sk === 'whip';
     const swordHand = this.sword.busy || !this.gun.hold.two || inHand;
-    const offhandBusy = this.sword.busy;
 
     if (swordBehind) this.sword.draw(g, hc, time, swordHand);
-    if (gunBehind) this.gun.draw(g, hc, offhandBusy, time, 'gun');
+    // one body, two hands: a blade in hand leaves the gun only one
+    if (gunBehind) this.gun.draw(g, hc, swordHand, time, 'gun');
     if (!blink) {
       const flashW = this.hurtFlash > 0.15 ? 1 : 0;
       const hop = Math.sin(Math.min(1, this.sword.hop) * Math.PI) * 3;
@@ -190,7 +191,7 @@ export class Player {
       const sy = clamp(this.sy * (1 - q * sa + q * 0.6 * ca), 0.55, 1.5);
       drawCube(g, skin, this.x, this.y - 1 - hop, this.size, this.tilt + this.sword.bodyRot + this.kRot, time, sx, sy, flashW);
     }
-    this.gun.draw(g, hc, offhandBusy, time, gunBehind ? 'hands' : 'all');
+    this.gun.draw(g, hc, swordHand, time, gunBehind ? 'hands' : 'all');
     if (!swordBehind) this.sword.draw(g, hc, time, swordHand);
   }
 

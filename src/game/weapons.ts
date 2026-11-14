@@ -1102,6 +1102,8 @@ export class SwordCtl {
   side = 1;
   aim = 0;
   restAim = 0;
+  /** where the whole body faces (the gun's aim); the resting blade follows it, not the threat */
+  bodyAim: number | null = null;
   /** which way the body faces (+1 right, -1 left) and the smoothed blend between the two */
   facing = 1;
   faceK = 1;
@@ -1267,34 +1269,34 @@ export class SwordCtl {
       case 'dagger': {
         let spin = 0;
         if (this.twirl >= 0) spin = ease.outCubic(this.twirl) * TAU * 2 * spinDir;
-        return { ang: 2.35 + t + spin, hand: 1.55 + t * 0.5, dist: 8 };
+        return { ang: 2.15 + t + spin, hand: 2.3 + t * 0.3, dist: 8 };
       }
       case 'longsword':
-        return { ang: -0.95 + t + Math.sin(time * 2) * 0.04, hand: 1.25 + t * 0.5, dist: 8 };
+        return { ang: 2.75 + t + Math.sin(time * 2) * 0.04, hand: 2.3 + t * 0.3, dist: 8 };
       case 'rapier':
-        return { ang: t + Math.sin(time * 3.1) * 0.12, hand: 0.75 + t * 0.6, dist: 9 + Math.sin(time * 3.1 + 1) * 0.7 };
+        return { ang: 2.95 + t + Math.sin(time * 3.1) * 0.08, hand: 2.35 + t * 0.3, dist: 8.5 + Math.sin(time * 3.1 + 1) * 0.5 };
       case 'katana':
         return { ang: Math.PI - 0.55 + t, hand: 1.75 + t * 0.3, dist: 6 };
       case 'greatsword':
         return { ang: -Math.PI * 0.82 + t + Math.sin(time * 1.6) * 0.03, hand: -1.45 + t * 0.3, dist: 5 };
       case 'scythe':
-        return { ang: -Math.PI * 0.6 + t + Math.sin(time * 1.4) * 0.06, hand: 1.9 + t * 0.3, dist: 6 };
+        return { ang: -2.1 + t + Math.sin(time * 1.4) * 0.06, hand: 2.4 + t * 0.3, dist: 6.5 };
       case 'saber':
-        return { ang: 0.85 + t + Math.sin(time * 2.2) * 0.05, hand: 1.3 + t * 0.4, dist: 8 };
+        return { ang: 2.45 + t + Math.sin(time * 2.2) * 0.05, hand: 2.3 + t * 0.3, dist: 8 };
       case 'cleaver':
-        return { ang: -2.25 + t, hand: -0.9 + t * 0.4, dist: 6 };
+        return { ang: 1.75 + t, hand: 2.2 + t * 0.3, dist: 7 };
       case 'katar':
-        return { ang: 0.12 + t, hand: 0.85 + t * 0.6, dist: 7 + Math.sin(time * 4) * 0.6 };
+        return { ang: 2.6 + t, hand: 2.3 + t * 0.3, dist: 7 + Math.sin(time * 4) * 0.4 };
       case 'spear':
-        return { ang: -1.2 + t, hand: 1.35 + t * 0.3, dist: 7 };
+        return { ang: -1.45 + t, hand: 2.4 + t * 0.3, dist: 7 };
       case 'nodachi':
         return { ang: 2.3 + t, hand: -2.15 + t * 0.3, dist: 4 };
       case 'twinblade':
-        return { ang: time * 1.6 * spinDir, hand: 0.9, dist: 8 };
+        return { ang: time * 1.6 * spinDir, hand: 2.3, dist: 8 };
       case 'whip':
-        return { ang: 0.7 + t + Math.sin(time * 2) * 0.05, hand: 1.3 + t * 0.4, dist: 8 };
+        return { ang: 2.0 + t + Math.sin(time * 2) * 0.05, hand: 2.3 + t * 0.3, dist: 8 };
       case 'plasma':
-        return { ang: 2.0 + t, hand: 1.6 + t * 0.3, dist: 7 };
+        return { ang: 2.6 + t, hand: 2.3 + t * 0.3, dist: 7.5 };
     }
   }
 
@@ -1313,10 +1315,11 @@ export class SwordCtl {
 
   update(dt: number, px: number, py: number, wantAim: number, time: number) {
     this.cd -= dt;
-    this.restAim += angDiff(this.restAim, wantAim) * Math.min(1, dt * 12);
+    const faceAim = this.bodyAim ?? wantAim;
+    this.restAim += angDiff(this.restAim, faceAim) * Math.min(1, dt * 12);
     this.sinceFlip += dt;
     this.sinceAttack += dt;
-    const c = Math.cos(wantAim);
+    const c = Math.cos(faceAim);
     if (!this.busy && this.sinceFlip > 0.25 && ((this.facing > 0 && c < -0.3) || (this.facing < 0 && c > 0.3))) {
       this.facing = -this.facing;
       this.sinceFlip = 0;
