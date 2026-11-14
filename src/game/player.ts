@@ -98,12 +98,13 @@ export class Player {
     this.walk += spd * dt * 0.12;
     const bounce = spd > 10 ? Math.abs(Math.sin(this.walk)) * 0.08 : 0;
     const dashS = this.dashT > 0 ? 0.25 : 0;
-    const crouch = this.sword.squash * 0.25 - this.sword.hop * 0.22;
+    const crouch = this.sword.squash * 0.1 - this.sword.hop * 0.06;
     this.sx = lerp(this.sx, 1 + bounce * 0.5 + dashS + crouch, Math.min(1, dt * 20));
     this.sy = lerp(this.sy, 1 - bounce - dashS * 0.6 - crouch, Math.min(1, dt * 20));
 
-    [this.kRot, this.kRotV] = spring(this.kRot, this.kRotV, 170, 13, dt);
-    [this.kSq, this.kSqV] = spring(this.kSq, this.kSqV, 260, 15, dt);
+    // critically damped: the body snaps over and settles back without wobbling
+    [this.kRot, this.kRotV] = spring(this.kRot, this.kRotV, 170, 26, dt);
+    [this.kSq, this.kSqV] = spring(this.kSq, this.kSqV, 400, 40, dt);
     this.inv -= dt;
     this.hurtFlash = Math.max(0, this.hurtFlash - dt);
     for (const gh of this.ghosts) gh.life -= dt;
@@ -197,46 +198,53 @@ export class Player {
     this.tilt -= 0.28 * k * (ca >= 0 ? 1 : -1);
   }
 
-  /** kick the sprung squash: amt > 0 squashes along a, amt < 0 stretches into it */
-  private squashAlong(a: number, amt: number) {
-    this.kSqA = a;
-    this.kSq = 0;
-    this.kSqV = amt * 24;
+  /** an after-image of the cube where it stands, for fast committed moves */
+  private afterimage(life = 0.12) {
+    this.ghosts.push({ x: this.x, y: this.y, ang: this.tilt + this.sword.bodyRot + this.kRot, life, c: this.skin.a });
   }
 
-  /** the cut leaves: the body twists with the blade and stretches into it */
+  /** the cut leaves: the body snaps into it, all weight behind the blade */
   swingFeel(a: number, side: number, heavy: boolean, fin: boolean) {
     if (this.dead) return;
-    const k = (heavy ? 1.4 : 1) * (fin ? 1.3 : 1);
-    this.kRotV += side * 8 * k;
-    this.squashAlong(a, -0.22 * k);
-    this.run.camKick(a + Math.PI, 0.9 * k);
+    const k = (heavy ? 1.35 : 1) * (fin ? 1.25 : 1);
+    this.afterimage();
+    this.kRot = clamp(this.kRot + side * 0.2 * k, -0.45, 0.45);
+    this.kRotV = 0;
+    this.run.camKick(a + Math.PI, 1.1 * k);
+    if (heavy || fin) this.run.fx.dust(this.x, this.y + 5, heavy ? 4 : 2, a + Math.PI, 0.6);
   }
 
-  /** the blade bites: a short jolt back from the contact */
+  /** the blade bites: a short hard jolt back from the contact */
   slashImpact(a: number, heavy: boolean) {
     if (this.dead) return;
-    const push = heavy ? 55 : 30;
+    const push = heavy ? 60 : 32;
     if (this.dashT <= 0) {
       this.vx -= Math.cos(a) * push;
       this.vy -= Math.sin(a) * push;
     }
-    this.squashAlong(a, heavy ? 0.2 : 0.12);
-    this.run.camKick(a + Math.PI, heavy ? 1.6 : 0.8);
+    this.run.camKick(a + Math.PI, heavy ? 1.8 : 0.9);
   }
 
-  /** a blow is turned aside: the cube is driven back, braced against it, and rocked */
+  /** a blow is turned aside: the cube is driven back and skids, braced against it */
   parryJolt(threat: number, perfect: boolean, force: number) {
     if (this.dead) return;
     // a perfect parry is clean: less of the blow gets through
-    const push = (perfect ? 95 : 150) * force;
+    const push = (perfect ? 100 : 160) * force;
     if (this.dashT <= 0) {
       this.vx -= Math.cos(threat) * push;
       this.vy -= Math.sin(threat) * push;
     }
-    this.squashAlong(threat, (perfect ? 0.24 : 0.3) * Math.min(1.3, force));
-    this.kRotV -= (Math.cos(threat) >= 0 ? 1 : -1) * (perfect ? 6 : 8.5) * Math.min(1.3, force);
-    this.run.camKick(threat, (perfect ? 2.5 : 3.5) * force);
+    const f = Math.min(1.3, force);
+    this.afterimage(0.16);
+    // braced: a hard set against the blow, no rebound
+    this.kSqA = threat;
+    this.kSq = (perfect ? 0.1 : 0.14) * f;
+    this.kSqV = 0;
+    this.kRot = clamp(this.kRot - (Math.cos(threat) >= 0 ? 1 : -1) * (perfect ? 0.2 : 0.3) * f, -0.5, 0.5);
+    this.kRotV = 0;
+    // heels skid away from the hit
+    if (force >= 0.6) this.run.fx.dust(this.x, this.y + 5, Math.round(5 * f), threat + Math.PI, 0.5);
+    this.run.camKick(threat, (perfect ? 2.8 : 3.8) * force);
   }
 
   /** aim helper used by the lobby demo */
