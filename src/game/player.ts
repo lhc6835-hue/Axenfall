@@ -170,6 +170,20 @@ export class Player {
     if (!swordBehind) this.sword.draw(g, hc, time, swordHand);
   }
 
+  /** a shot's recoil: shoved back along the line of fire, squashed against it, rocked back */
+  recoil(aim: number, push: number, squash: number) {
+    if (this.dead) return;
+    const ca = Math.cos(aim), sa = Math.sin(aim);
+    if (this.dashT <= 0) {
+      this.vx -= ca * push;
+      this.vy -= sa * push;
+    }
+    const k = Math.min(1, squash);
+    this.sx = Math.max(0.6, this.sx - 0.22 * k * Math.abs(ca));
+    this.sy = Math.max(0.6, this.sy - 0.22 * k * Math.abs(sa));
+    this.tilt -= 0.28 * k * (ca >= 0 ? 1 : -1);
+  }
+
   /** aim helper used by the lobby demo */
   faceToward(a: number, dt: number) {
     this.swordAim += angDiff(this.swordAim, a) * Math.min(1, dt * 8);

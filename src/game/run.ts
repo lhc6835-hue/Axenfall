@@ -86,6 +86,9 @@ export class Run {
   shakeAmp = 0;
   shakeX = 0;
   shakeY = 0;
+  /** directional camera kick from gunfire, springs back */
+  kickX = 0;
+  kickY = 0;
   camX = 0;
   camY = 0;
   over = false;
@@ -121,6 +124,12 @@ export class Run {
   }
   shake(a: number) {
     this.shakeAmp = Math.min(12, Math.max(this.shakeAmp, a));
+  }
+  /** the view is shoved away from the line of fire */
+  camKick(aim: number, amt: number) {
+    if (this.demo) return;
+    this.kickX = Math.max(-10, Math.min(10, this.kickX - Math.cos(aim) * amt));
+    this.kickY = Math.max(-10, Math.min(10, this.kickY - Math.sin(aim) * amt));
   }
   flash(a: number, c = 0xffffff) {
     this.g.flash = Math.max(this.g.flash, a);
@@ -598,6 +607,9 @@ export class Run {
     const sa = this.shakeAmp;
     this.shakeX = (Math.random() * 2 - 1) * sa;
     this.shakeY = (Math.random() * 2 - 1) * sa;
+    const kd = Math.exp(-realDt * 16);
+    this.kickX *= kd;
+    this.kickY *= kd;
     if (this.choosing) return;
     if (this.freeze > 0) {
       // hit-stop: the whole world holds still for a beat
@@ -773,8 +785,8 @@ export class Run {
   // ---------------- render ----------------
   render(ctx: CanvasRenderingContext2D) {
     const g = this.g;
-    g.ox = Math.round(g.w / 2 - this.camX + this.shakeX);
-    g.oy = Math.round(g.h / 2 - this.camY + this.shakeY);
+    g.ox = Math.round(g.w / 2 - this.camX + this.shakeX + this.kickX);
+    g.oy = Math.round(g.h / 2 - this.camY + this.shakeY + this.kickY);
     g.clear(0x14121f);
     this.drawFloor();
     this.fx.drawBack(g);

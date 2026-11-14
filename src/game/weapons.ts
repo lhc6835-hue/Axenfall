@@ -12,25 +12,34 @@ interface Hold {
   side: number;
   two: boolean;
   fore: [number, number];
+  /** recoil per shot: slide back (px), muzzle flip (rad), shove on the body (px/s), camera kick (px) */
   kick: number;
   climb: number;
+  push: number;
+  cam: number;
+  /** how stiffly it comes back (higher = snappier) */
+  ret: number;
+  /** sideways wobble on automatic fire (rad) */
+  yaw?: number;
+  /** a sliver of hit-stop on the shot itself for heavy guns */
+  stop?: number;
 }
 const HOLD: Record<GunKind, Hold> = {
-  pistol: { d: 9, side: 2, two: false, fore: [0, 0], kick: 70, climb: 9 },
-  revolver: { d: 9, side: 2, two: false, fore: [0, 0], kick: 95, climb: 14 },
-  smg: { d: 8.5, side: 2.5, two: false, fore: [0, 0], kick: 30, climb: 3 },
-  shotgun: { d: 7, side: 2.5, two: true, fore: [8.5, -1.2], kick: 140, climb: 10 },
-  sniper: { d: 6, side: 2.5, two: true, fore: [10, -1.5], kick: 160, climb: 8 },
-  minigun: { d: 7, side: 3.5, two: true, fore: [-1.5, -9], kick: 14, climb: 1.2 },
-  railgun: { d: 7, side: 2.5, two: true, fore: [8, 0], kick: 220, climb: 12 },
-  derringer: { d: 8, side: 2, two: false, fore: [0, 0], kick: 50, climb: 12 },
-  lever: { d: 8, side: 2.5, two: false, fore: [0, 0], kick: 90, climb: 12 },
-  rifle: { d: 6, side: 2.5, two: true, fore: [10, -1.5], kick: 40, climb: 4 },
-  laser: { d: 9, side: 2, two: false, fore: [0, 0], kick: 22, climb: 3 },
-  dbarrel: { d: 8, side: 2, two: false, fore: [0, 0], kick: 150, climb: 24 },
-  cannon: { d: 9, side: 2, two: false, fore: [0, 0], kick: 150, climb: 34 },
-  musket: { d: 5, side: 2.5, two: true, fore: [12, -1.5], kick: 190, climb: 10 },
-  launcher: { d: 6, side: 3, two: true, fore: [10.8, 0.5], kick: 170, climb: 9 },
+  pistol: { d: 9, side: 2, two: false, fore: [0, 0], kick: 2.6, climb: 0.28, push: 30, cam: 1.6, ret: 1 },
+  revolver: { d: 9, side: 2, two: false, fore: [0, 0], kick: 3.4, climb: 0.5, push: 55, cam: 2.6, ret: 0.8 },
+  smg: { d: 8.5, side: 2.5, two: false, fore: [0, 0], kick: 1.3, climb: 0.07, push: 9, cam: 0.7, ret: 1.4, yaw: 0.06 },
+  shotgun: { d: 7, side: 2.5, two: true, fore: [8.5, -1.2], kick: 4.5, climb: 0.38, push: 130, cam: 4.5, ret: 0.75, stop: 0.02 },
+  sniper: { d: 6, side: 2.5, two: true, fore: [10, -1.5], kick: 5, climb: 0.3, push: 110, cam: 4.5, ret: 0.7, stop: 0.02 },
+  minigun: { d: 7, side: 3.5, two: true, fore: [-1.5, -9], kick: 1, climb: 0.035, push: 7, cam: 0.5, ret: 1.6, yaw: 0.05 },
+  railgun: { d: 7, side: 2.5, two: true, fore: [8, 0], kick: 6, climb: 0.35, push: 170, cam: 6.5, ret: 0.6, stop: 0.03 },
+  derringer: { d: 8, side: 2, two: false, fore: [0, 0], kick: 2, climb: 0.32, push: 25, cam: 1.5, ret: 1.1 },
+  lever: { d: 8, side: 2.5, two: false, fore: [0, 0], kick: 3.4, climb: 0.36, push: 55, cam: 2.6, ret: 0.9 },
+  rifle: { d: 6, side: 2.5, two: true, fore: [10, -1.5], kick: 1.7, climb: 0.1, push: 16, cam: 1.1, ret: 1.3, yaw: 0.04 },
+  laser: { d: 9, side: 2, two: false, fore: [0, 0], kick: 1, climb: 0.06, push: 6, cam: 0.6, ret: 1.4, yaw: 0.03 },
+  dbarrel: { d: 8, side: 2, two: false, fore: [0, 0], kick: 5, climb: 0.75, push: 150, cam: 5, ret: 0.65, stop: 0.025 },
+  cannon: { d: 9, side: 2, two: false, fore: [0, 0], kick: 5, climb: 0.95, push: 150, cam: 5.5, ret: 0.55, stop: 0.03 },
+  musket: { d: 5, side: 2.5, two: true, fore: [12, -1.5], kick: 6, climb: 0.38, push: 180, cam: 6.5, ret: 0.6, stop: 0.03 },
+  launcher: { d: 6, side: 3, two: true, fore: [10.8, 0.5], kick: 5, climb: 0.3, push: 140, cam: 5, ret: 0.65, stop: 0.02 },
 };
 
 /** post-shot action length (pump, bolt) */
@@ -53,6 +62,8 @@ export class GunCtl {
   kickV = 0;
   climb = 0;
   climbV = 0;
+  yaw = 0;
+  yawV = 0;
   cycle = -1;
   flourish = -1;
   idle = 0;
@@ -138,8 +149,10 @@ export class GunCtl {
     this.aim += angDiff(this.aim, want) * Math.min(1, dt * turn);
 
     // ---- springs ----
-    [this.kick, this.kickV] = spring(this.kick, this.kickV, 380, 24, dt);
-    [this.climb, this.climbV] = spring(this.climb, this.climbV, 300, 20, dt);
+    const ret = this.hold.ret;
+    [this.kick, this.kickV] = spring(this.kick, this.kickV, 700 * ret * ret, 30 * ret, dt);
+    [this.climb, this.climbV] = spring(this.climb, this.climbV, 260 * ret * ret, 17 * ret, dt);
+    [this.yaw, this.yawV] = spring(this.yaw, this.yawV, 500, 22, dt);
 
     // ---- minigun barrel spin ----
     if (def.kind === 'minigun') {
@@ -236,7 +249,7 @@ export class GunCtl {
   muzzle(): [number, number] {
     const [mu, mv] = MUZZLE[this.def.kind];
     const x = new Xf(null as unknown as Gfx, this.hx, this.hy, this.aim, this.fy);
-    return x.pt(mu - this.kick * 0.03, mv);
+    return x.pt(mu - this.kick, mv);
   }
 
   /** pull the trigger: bursts and the flintlock's delay are handled here */
@@ -298,9 +311,17 @@ export class GunCtl {
     }
     if (k === 'laser') run.fx.ring(mx, my, 1, 6, 0.12, def.tracer, 1);
     run.fx.sparks(mx, my, this.aim, 0.5, def.kind === 'shotgun' ? 6 : 2, 160, 0xffb84a, 0xffffff, 0.12);
-    // kick
-    this.kickV += this.hold.kick;
-    this.climbV += this.hold.climb * (1 + rand(-0.2, 0.2));
+    // recoil: the gun snaps back and flips up at once, then springs home
+    const h = this.hold;
+    this.kick = Math.min(h.kick * 1.6, this.kick + h.kick);
+    this.kickV = 0;
+    this.climb = Math.min(h.climb * 1.5, this.climb + h.climb * rand(0.85, 1.15));
+    this.climbV = 0;
+    if (h.yaw) this.yawV += rand(-1, 1) * h.yaw * 40;
+    // ...and the shooter and the camera take the shove too
+    run.player.recoil(this.aim, h.push, h.kick / 6);
+    run.camKick(this.aim, h.cam);
+    if (h.stop) run.hitstop(h.stop);
     run.shake(def.shake * 0.5);
     if (def.kind === 'railgun') run.hitstop(0.04);
     if (anyKill) run.hitstop(def.stop);
@@ -427,7 +448,7 @@ export class GunCtl {
         if (at(0.56)) sfx.foley('cyl_spin', 0.6, 1.2);
         if (at(0.6) || at(0.78)) sfx.spin();
         if (at(0.97)) {
-          this.kickV += 30;
+          this.kickV += 25;
           sfx.click(1.4);
         }
         break;
@@ -447,7 +468,7 @@ export class GunCtl {
           const k = (0.18 + per * (i + 0.6)) / T;
           if (at(k)) {
             this.ammo = Math.min(this.magSize(), this.ammo + 1);
-            this.kickV -= 25;
+            this.kickV -= 18;
             sfx.foley('shell_load', 0.8, 1 + Math.random() * 0.08);
           }
         }
@@ -509,7 +530,7 @@ export class GunCtl {
           const k = (0.18 + per * (i + 0.6)) / T;
           if (at(k)) {
             this.ammo = Math.min(this.magSize(), this.ammo + 1);
-            this.kickV -= 20;
+            this.kickV -= 15;
             if (this.def.kind === 'launcher') this.drumTo += 1;
             sfx.foley(this.def.kind === 'lever' ? 'gate' : 'shell_load', 0.8, this.def.kind === 'launcher' ? 0.8 : 1 + Math.random() * 0.08);
           }
@@ -527,7 +548,7 @@ export class GunCtl {
         if (at(0.55)) sfx.foley('ar_in');
         if (at(0.64)) {
           // palm slap on the bottom of the magazine
-          this.kickV -= 30;
+          this.kickV -= 22;
           sfx.foley('mag_in', 0.5, 1.3);
         }
         if (at(0.8)) sfx.foley('ar_bolt');
@@ -562,7 +583,7 @@ export class GunCtl {
         if (at(0.58)) sfx.foley('mag_in', 1, 0.85);
         if (at(0.8)) {
           sfx.foley('slide', 1, 0.8);
-          this.kickV += 40;
+          this.kickV += 30;
         }
         break;
       case 'musket':
@@ -629,8 +650,8 @@ export class GunCtl {
     p.handC = handC;
     const kind = this.def.kind;
     const h = this.hold;
-    let rot = -this.climb * 0.02; // negative = muzzle up
-    let du = -this.kick * 0.03, dv = 0;
+    let rot = -this.climb + this.yaw; // negative = muzzle up
+    let du = -this.kick, dv = 0;
     let spin = 0;
     let drumSpin = 0;
     let pivot: [number, number] = [1, 0];
