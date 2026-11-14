@@ -1,0 +1,11 @@
+# Account API for PARRY CUBE on workers.dev:  cd worker && npx wrangler deploy
+name = "parrycube-api"
+main = "api.ts"
+compatibility_date = "2024-11-01"
+workers_dev = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "parrycube"
+# the id of the D1 database named "parrycube" (wrangler d1 list)
+database_id = "REPLACE_WITH_D1_ID"
