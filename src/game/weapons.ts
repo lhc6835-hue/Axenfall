@@ -1112,6 +1112,11 @@ export const STOW: Record<SwordKind, { ang: number; hand: number; dist: number; 
   twinblade: { ang: -2.3, hand: 0.7, dist: 2, back: true },
 };
 
+/** blades that ride in a sheath (the rest hang in a loop or a strap) */
+const SHEATHED: Partial<Record<SwordKind, true>> = { dagger: true, rapier: true, saber: true, longsword: true, katar: true };
+const PULL_T = 0.14;
+const SHEATH_T = 0.34;
+
 const HEAVY: Partial<Record<SwordKind, true>> = { greatsword: true, scythe: true, cleaver: true, nodachi: true };
 const WHIP_N = 10;
 
@@ -1129,6 +1134,20 @@ export class SwordCtl {
   bodyAim: number | null = null;
   /** both hands are on a long gun: the blade rides on the body (back, hip, belt) instead of in a hand */
   stowed = false;
+  /** the blade is out of its carry spot (between cuts) */
+  drawn = false;
+  /** drawing the blade out of the sheath / strap: 0..1, -1 when idle */
+  pull = -1;
+  /** putting it back: 0..1, -1 when idle */
+  sheath = -1;
+  /** the pose a windup starts from when it is not the rest pose (after a pull, or a cancelled sheathe) */
+  private fromPose: { ang: number; hand: number; dist: number } | null = null;
+  private lastHand = 0;
+  private lastDist = 8;
+  /** the blade is on the body right now */
+  get carried() {
+    return this.stowed && !this.drawn && !SAYA[this.def.kind];
+  }
   /** which way the body faces (+1 right, -1 left) and the smoothed blend between the two */
   facing = 1;
   faceK = 1;
@@ -1231,6 +1250,17 @@ export class SwordCtl {
     this.sheathClick = false;
     this.step = -1;
     const k = this.def.kind;
+    this.fromPose = null;
+    if (this.carried) {
+      // reach back and draw it out before the cut
+      this.drawn = true;
+      this.pull = 0;
+      sfx.foley('blade', 0.45, 1.25);
+    } else if (this.sheath >= 0) {
+      // caught on the way back in: cut from wherever the blade is
+      this.sheath = -1;
+      this.fromPose = { ang: this.ang, hand: this.lastHand, dist: this.lastDist };
+    }
     if (HEAVY[k] || mv.hop === -1) this.squash = 1;
     if (k === 'plasma' && this.ext < 0.5) sfx.foley('ignite', 0.5, 1.2);
     if (mv.twirlIn) sfx.spin();
@@ -1290,7 +1320,7 @@ export class SwordCtl {
   /** rest pose for a body facing right, given the aim folded into the right half */
   private restRight(aimR: number, time: number, spinDir: number): { ang: number; hand: number; dist: number } {
     const t = Math.max(-1.3, Math.min(1.3, angDiff(0, aimR))) * LEAN[this.def.kind];
-    if (this.stowed) {
+    if (this.stowed && (this.forceStow || !this.drawn)) {
       // carried on the body while both hands hold the gun: across the back, or at the hip
       const st = STOW[this.def.kind];
       return { ang: st.ang + t * 0.15, hand: st.hand, dist: st.dist };
@@ -1328,6 +1358,23 @@ export class SwordCtl {
       case 'plasma':
         return { ang: 2.6 + t, hand: 2.3 + t * 0.3, dist: 7.5 };
     }
+  }
+
+  private forceStow = false;
+  /** where the blade sits when carried on the body */
+  stowPose(time: number) {
+    this.forceStow = true;
+    const r = this.restPose(time);
+    this.forceStow = false;
+    return r;
+  }
+  /** the stow pose with the grip slid back out along the blade by k of its length (the sheath mouth) */
+  private pulledPose(time: number, k: number) {
+    const st = this.stowPose(time);
+    const L = BLADE_LEN[this.def.kind] * 0.85 * k;
+    const gx = Math.cos(st.hand) * st.dist - Math.cos(st.ang) * L;
+    const gy = Math.sin(st.hand) * st.dist - Math.sin(st.ang) * L;
+    return { ang: st.ang, hand: Math.atan2(gy, gx), dist: Math.hypot(gx, gy) };
   }
 
   restPose(time: number): { ang: number; hand: number; dist: number } {
@@ -1404,8 +1451,48 @@ export class SwordCtl {
       case 'rest':
         this.ext = Math.max(0, this.ext - dt * 6);
         this.bodyRot += angDiff(this.bodyRot, 0) * Math.min(1, dt * 14);
+        if (!this.stowed) this.drawn = false;
+        if (this.drawn && this.sheath < 0 && this.sinceAttack > 1.1 && !SAYA[k]) this.sheath = 0;
+        if (this.sheath >= 0) {
+          this.sheath = Math.min(1, this.sheath + dt / SHEATH_T);
+          // carry it to the mouth of the sheath, then slide it home
+          const a = ease.inOutCubic(seg(this.sheath, 0, 0.6));
+          const b = ease.inCubic(seg(this.sheath, 0.6, 1));
+          const mouth = this.pulledPose(time, 1 - b);
+          absAng = lerpAng(rest.ang, mouth.ang, a);
+          absHand = lerpAng(rest.hand, mouth.hand, a);
+          dist = lerp(rest.dist, mouth.dist, a);
+          if (this.sheath >= 1) {
+            this.sheath = -1;
+            this.drawn = false;
+            sfx.sheathe();
+            const [mx, my] = [px + Math.cos(absHand) * dist, py + Math.sin(absHand) * dist];
+            this.run.fx.flare(mx, my, 3, 0xfff0c0, 0.06);
+          }
+        }
         break;
       case 'windup': {
+        if (this.pull >= 0) {
+          this.pull = Math.min(1, this.pull + dt / PULL_T);
+          this.t = 0;
+          const q = ease.inOutCubic(this.pull);
+          const p0 = this.pulledPose(time, q);
+          absAng = p0.ang;
+          absHand = p0.hand;
+          dist = p0.dist;
+          if (this.pull >= 1) {
+            this.pull = -1;
+            this.fromPose = p0;
+            const [mx, my] = [px + Math.cos(p0.hand) * p0.dist, py + Math.sin(p0.hand) * p0.dist];
+            this.run.fx.flare(mx, my, 3, 0xffffff, 0.05);
+          }
+          break;
+        }
+        if (this.fromPose) {
+          rest.ang = this.fromPose.ang;
+          rest.hand = this.fromPose.hand;
+          rest.dist = this.fromPose.dist;
+        }
         const W = this.dur('w');
         const u = ease.outCubic(clamp(this.t / W, 0, 1));
         if (mo === 'thrust') {
@@ -1429,6 +1516,7 @@ export class SwordCtl {
         }
         if (k === 'plasma') this.ext = Math.max(this.ext, u);
         if (advance('swing', W)) {
+          this.fromPose = null;
           sfx.swing(k);
           if (mv.fin) sfx.play(['swing_h1', 'swing_h2'], { vol: 0.35, rate: 1.2 });
           this.prevRel = stabbing ? 0 : from;
@@ -1597,6 +1685,8 @@ export class SwordCtl {
     }
 
     this.ang = absAng;
+    this.lastHand = absHand;
+    this.lastDist = dist;
     this.hx = px + Math.cos(absHand) * dist;
     this.hy = py + Math.sin(absHand) * dist;
     if (mo === 'whip' && this.state !== 'deflect') this.updateChain(dt);
@@ -1810,6 +1900,30 @@ export class SwordCtl {
       const L = BLADE_LEN[k];
       const [tx, ty] = X.pt(L * 0.7, 0);
       g.glow(tx, ty, 10, 0xffffff, this.state === 'deflect' ? 0.4 : 0.25);
+    }
+  }
+
+  /** the empty sheath or the strap the blade rides in while a long gun has both hands */
+  drawCarry(g: Gfx, time: number) {
+    if (!this.stowed || SAYA[this.def.kind]) return;
+    const k = this.def.kind;
+    const st = this.stowPose(time);
+    const fy = this.faceK >= 0 ? 1 : -1;
+    const gx = this.hx0 + Math.cos(st.hand) * st.dist, gy = this.hy0 + Math.sin(st.hand) * st.dist;
+    const X = new Xf(g, gx, gy, st.ang, fy);
+    if (SHEATHED[k]) {
+      const L = BLADE_LEN[k];
+      const w = k === 'longsword' || k === 'saber' ? 3.6 : 3.2;
+      X.q(1, -w / 2 - 0.5, L - 0.5, w + 1, 0x0c0a14);
+      X.q(1.5, -w / 2, L - 1.5, w, 0x3a2418);
+      X.q(1.5, -w / 2, L - 1.5, 1, 0x6a4430);
+      X.q(1, -w / 2 - 0.5, 1.6, w + 1, 0xc8a050); // throat
+      X.q(L - 1.5, -w / 2, 1.5, w, 0xc8a050); // chape
+    } else {
+      // a leather loop with a buckle where it hangs
+      X.q(1.5, -2.6, 2.2, 5.2, 0x0c0a14);
+      X.q(2, -2.2, 1.4, 4.4, 0x5a3420);
+      X.q(2.2, -0.6, 1, 1.2, 0xc8a050);
     }
   }
 

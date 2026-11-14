@@ -174,12 +174,19 @@ export class Player {
     const blink = this.inv > 0 && !this.dead && Math.sin(time * 50) > 0 && this.hurtFlash > 0;
     // long guns ride along the body's side: the stock tucks behind it, the hands stay in front
     const gunBehind = Math.sin(this.gun.aim) < -0.35 || (this.gun.hold.two && Math.sin(this.gun.aim) < 0.55);
-    const resting = this.sword.state === 'rest';
-    const swordBehind = resting && (Math.sin(this.sword.ang) < -0.2 || (this.sword.stowed && STOW[this.sword.def.kind].back));
-    // stowed blades (back, hip) rest without a hand while the gun needs both
-    const swordHand = this.sword.busy || !this.sword.stowed;
+    const sw = this.sword;
+    const resting = sw.state === 'rest';
+    const onBack = sw.stowed && STOW[sw.def.kind].back;
+    // a blade on the back sits behind the body, also for the last part of being slid home
+    const swordBehind =
+      (resting && (Math.sin(sw.ang) < -0.2 || (onBack && (sw.carried || sw.sheath > 0.6)))) ||
+      // drawn up out of a back sheath: it clears the body only near the end of the pull
+      (onBack && sw.pull >= 0 && sw.pull < 0.7);
+    // a carried blade rests without a hand while the gun has both; drawn, it takes the rear hand
+    const swordHand = sw.busy || !sw.stowed || sw.drawn;
 
-    if (swordBehind) this.sword.draw(g, hc, time, swordHand);
+    if (swordBehind) sw.draw(g, hc, time, swordHand);
+    if (onBack) sw.drawCarry(g, time);
     // one body, two hands: a blade in hand leaves the gun only one
     if (gunBehind) this.gun.draw(g, hc, swordHand, time, 'gun');
     if (!blink) {
@@ -193,7 +200,8 @@ export class Player {
       drawCube(g, skin, this.x, this.y - 1 - hop, this.size, this.tilt + this.sword.bodyRot + this.kRot, time, sx, sy, flashW);
     }
     this.gun.draw(g, hc, swordHand, time, gunBehind ? 'hands' : 'all');
-    if (!swordBehind) this.sword.draw(g, hc, time, swordHand);
+    if (!swordBehind) sw.draw(g, hc, time, swordHand);
+    if (sw.stowed && !onBack) sw.drawCarry(g, time);
   }
 
   /** a shot's recoil: shoved back along the line of fire, squashed against it, rocked back */
