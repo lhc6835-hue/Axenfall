@@ -1105,7 +1105,8 @@ export const STOW: Record<SwordKind, { ang: number; hand: number; dist: number; 
   saber: { ang: 2.4, hand: 2.0, dist: 5.5, back: false },
   longsword: { ang: 2.05, hand: -1.15, dist: 6, back: true },
   cleaver: { ang: 1.95, hand: -1.25, dist: 5, back: true },
-  greatsword: { ang: -Math.PI * 0.82, hand: -1.45, dist: 5, back: true },
+  // slung across the back: the hilt rises behind the shoulder, the blade runs down behind the body
+  greatsword: { ang: 2.0, hand: -1.3, dist: 8, back: true },
   nodachi: { ang: 2.3, hand: -2.15, dist: 4, back: true },
   scythe: { ang: -2.25, hand: 0.9, dist: 2.5, back: true },
   spear: { ang: -2.0, hand: 0.6, dist: 3, back: true },
