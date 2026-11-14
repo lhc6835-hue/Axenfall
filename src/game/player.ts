@@ -144,7 +144,7 @@ export class Player {
     this.sword.hx0 = ax;
     this.sword.hy0 = ay;
     this.sword.update(dt, ax, ay, aim, time);
-    if (this.sword.parryT > 0) run.parryShots(this.x, this.y, this.sword.reach() + 4, this.sword);
+    if (this.sword.parryActive()) run.parryShots(this.x, this.y, this.sword.reach() + 4, this.sword);
 
     // the rear hand belongs to the blade while it is out: a long gun is then fired one-handed,
     // and lowered with its fire held while that hand reaches back to draw or sheathe

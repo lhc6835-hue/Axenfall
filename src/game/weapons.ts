@@ -1181,6 +1181,10 @@ export class SwordCtl {
   hy = 0;
   parryT = 0;
   parryAge = 0;
+  /** where the blade has actually been during this attack: direction from the body, and when */
+  private hist: { t: number; a: number }[] = [];
+  private clk = 0;
+  private lastPerfect = false;
   hit = new Set<Enemy>();
   prevRel = 0;
   trail: TrailPt[] = [];
@@ -1263,6 +1267,7 @@ export class SwordCtl {
     this.hitStopDone = false;
     this.parryT = this.parryWindow();
     this.parryAge = 0;
+    this.hist.length = 0;
     this.twirl = -1;
     this.trail.length = 0;
     this.trail2.length = 0;
@@ -1310,15 +1315,47 @@ export class SwordCtl {
     return this.move.m === m && this.state !== 'rest' && this.state !== 'deflect';
   }
 
-  /** a parry is active and `a` (angle from owner to threat) is inside the guarded sector */
-  guards(a: number) {
-    if (this.parryT <= 0) return false;
-    if (this.def.arc >= 6 || this.move.span >= 6) return true;
-    const half = Math.max(this.def.arc / 2, 1.0) + 0.45;
-    return Math.abs(angDiff(this.aim, a)) <= half;
+  /** how long a direction stays guarded after the blade has passed through it */
+  private linger() {
+    return this.def.parry + this.run.mods.parryWin;
   }
+  /** the blade has been out recently enough that a parry is possible at all */
+  parryActive() {
+    const n = this.hist.length;
+    return n > 0 && this.clk - this.hist[n - 1].t <= this.linger();
+  }
+  /**
+   * A parry only happens where the blade really is or has just been: `a` (angle from the owner to
+   * the threat) must lie on the path the blade swept within the linger time. Meeting the threat as
+   * the edge crosses it (within 0.05s) is PERFECT.
+   */
+  guards(a: number) {
+    this.lastPerfect = false;
+    const H = this.hist;
+    if (!H.length) return false;
+    const mo = this.move.m;
+    const tol = mo === 'thrust' || mo === 'jabs' ? 0.5 : mo === 'whip' ? 0.55 : 0.38;
+    const keep = this.linger();
+    for (let i = H.length - 1; i >= 0; i--) {
+      const age = this.clk - H[i].t;
+      if (age > keep) break;
+      let hit = Math.abs(angDiff(H[i].a, a)) <= tol;
+      if (!hit && i > 0) {
+        // between two samples the blade swept the arc from one to the other
+        const d = angDiff(H[i - 1].a, H[i].a);
+        const da = angDiff(H[i - 1].a, a);
+        hit = d >= 0 ? da >= -tol && da <= d + tol : da <= tol && da >= d - tol;
+      }
+      if (hit) {
+        this.lastPerfect = age <= 0.05;
+        return true;
+      }
+    }
+    return false;
+  }
+  /** whether the last successful guards() call caught the blade right on its edge */
   perfect() {
-    return this.parryAge <= 0.075;
+    return this.lastPerfect;
   }
 
   /** swing path, in angles relative to aim */
@@ -1617,7 +1654,7 @@ export class SwordCtl {
           if (spinning && mv.body) this.bodyRot = rel - from;
           if (mo === 'whip') this.ext = ease.outCubic(u);
           if (mo !== 'whip') this.sweepArc(px, py, reach, this.prevRel, rel);
-          else if (this.parryT > 0) this.run.parryShots(px, py, reach * 0.7, this);
+          else if (this.parryActive()) this.run.parryShots(px, py, reach * 0.7, this);
           this.prevRel = rel;
         }
         if (k === 'plasma') this.ext = 1;
@@ -1706,6 +1743,15 @@ export class SwordCtl {
     this.ang = absAng;
     this.lastHand = absHand;
     this.lastDist = dist;
+    // log where the blade is: the direction of its middle as seen from the body
+    this.clk += dt;
+    const live = this.state === 'windup' || this.state === 'swing' || this.state === 'hold' || this.state === 'deflect' || (this.state === 'recover' && this.t < 0.06);
+    if (live && this.pull < 0) {
+      const L = BLADE_LEN[k] * (this.move.m === 'whip' ? 1.6 : 0.55);
+      const mx = Math.cos(absHand) * dist + Math.cos(absAng) * L, my = Math.sin(absHand) * dist + Math.sin(absAng) * L;
+      this.hist.push({ t: this.clk, a: Math.atan2(my, mx) });
+      if (this.hist.length > 120) this.hist.shift();
+    }
     this.hx = px + Math.cos(absHand) * dist;
     this.hy = py + Math.sin(absHand) * dist;
     if (mo === 'whip' && this.state !== 'deflect') this.updateChain(dt);
@@ -1823,7 +1869,7 @@ export class SwordCtl {
       if (d < e.r + 6) inside = true;
       if (inside) this.strike(e, dx / (d || 1), dy / (d || 1), mul);
     }
-    if (this.parryT > 0) this.run.parryShots(px, py, reach + 4, this);
+    if (this.parryActive()) this.run.parryShots(px, py, reach + 4, this);
   }
 
   private sweepThrust(px: number, py: number, len: number, a: number) {
@@ -1834,7 +1880,7 @@ export class SwordCtl {
       if (e.dead || this.hit.has(e)) continue;
       if (segDist(e.x, e.y, px, py, ex, ey) < e.r + 4) this.strike(e, ca, sa, mul);
     }
-    if (this.parryT > 0) this.run.parryShots(px, py, len + 6, this);
+    if (this.parryActive()) this.run.parryShots(px, py, len + 6, this);
   }
 
   private sweepAround(cx: number, cy: number, reach: number, px: number, py: number) {
@@ -1846,7 +1892,7 @@ export class SwordCtl {
       const ox = e.x - px, oy = e.y - py, od = Math.hypot(ox, oy) || 1;
       this.strike(e, ox / od, oy / od, mul);
     }
-    if (this.parryT > 0) this.run.parryShots(px, py, reach + 12, this);
+    if (this.parryActive()) this.run.parryShots(px, py, reach + 12, this);
   }
 
   private strike(e: Enemy, nx: number, ny: number, mul = 1) {
@@ -1915,7 +1961,7 @@ export class SwordCtl {
     if (extended) this.drawChain(g);
     if (showHand) hand(X, GRIP[k], 0, handC);
     // a cold glint along the edge while guarding or in the perfect window
-    if ((this.parryT > 0 && this.perfect()) || (this.state === 'deflect' && this.t < 0.14)) {
+    if (this.state === 'swing' || (this.state === 'deflect' && this.t < 0.14)) {
       const L = BLADE_LEN[k];
       const [tx, ty] = X.pt(L * 0.7, 0);
       g.glow(tx, ty, 10, 0xffffff, this.state === 'deflect' ? 0.4 : 0.25);
