@@ -4,7 +4,7 @@ import { sfx } from '../engine/audio';
 import type { Input } from '../engine/input';
 import { drawCube, handColor } from './art';
 import type { GunDef, SkinDef, SwordDef } from './data';
-import { GunCtl, SwordCtl } from './weapons';
+import { GunCtl, STOW, SwordCtl } from './weapons';
 import type { Run } from './run';
 
 interface Ghost { x: number; y: number; ang: number; life: number; c: number }
@@ -139,6 +139,8 @@ export class Player {
 
     const ax = this.x + this.carryX, ay = this.y + this.carryY;
     this.sword.bodyAim = this.dead ? null : this.gun.aim;
+    // a long gun takes both hands: the blade rides on the body until it is drawn to cut
+    this.sword.stowed = this.gun.hold.two;
     this.sword.hx0 = ax;
     this.sword.hy0 = ay;
     this.sword.update(dt, ax, ay, aim, time);
@@ -172,11 +174,10 @@ export class Player {
     const blink = this.inv > 0 && !this.dead && Math.sin(time * 50) > 0 && this.hurtFlash > 0;
     // long guns ride along the body's side: the stock tucks behind it, the hands stay in front
     const gunBehind = Math.sin(this.gun.aim) < -0.35 || (this.gun.hold.two && Math.sin(this.gun.aim) < 0.55);
-    const swordBehind = Math.sin(this.sword.ang) < -0.2 && this.sword.state === 'rest';
-    // stowed blades (saya, back, belt, shoulder) rest without a hand when the gun needs both
-    const sk = this.sword.def.kind;
-    const inHand = sk === 'dagger' || sk === 'rapier' || sk === 'longsword' || sk === 'saber' || sk === 'katar' || sk === 'cleaver' || sk === 'spear' || sk === 'twinblade' || sk === 'whip';
-    const swordHand = this.sword.busy || !this.gun.hold.two || inHand;
+    const resting = this.sword.state === 'rest';
+    const swordBehind = resting && (Math.sin(this.sword.ang) < -0.2 || (this.sword.stowed && STOW[this.sword.def.kind].back));
+    // stowed blades (back, hip) rest without a hand while the gun needs both
+    const swordHand = this.sword.busy || !this.sword.stowed;
 
     if (swordBehind) this.sword.draw(g, hc, time, swordHand);
     // one body, two hands: a blade in hand leaves the gun only one

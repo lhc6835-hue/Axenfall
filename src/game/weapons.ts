@@ -925,6 +925,8 @@ export class GunCtl {
     }
     if (this.def.heat && !this.reloading) p.heat = 1 - this.ammo / this.magSize();
     p.barrel = this.barrel;
+    // two hands, never three: while the rear hand holds the blade the gun is worked one-handed
+    if (swordUsingOffhand) hand2 = null;
     p.hand2 = hand2;
     // while twirling, the hand stays at the pivot (trigger finger / pump grip)
     const grip: [number, number] = spin !== 0 ? pivot : [0, 0.5];
@@ -1089,6 +1091,27 @@ const GRIP: Record<SwordKind, number> = {
 };
 /** weapons that live in a scabbard at rest */
 const SAYA: Partial<Record<SwordKind, number>> = { katana: 18, nodachi: 27 };
+/**
+ * Where each blade rides on the body when both hands are on a long gun (facing right).
+ * back: hilt up behind the shoulder, blade across the back (drawn behind the body); hip: at the belt.
+ */
+export const STOW: Record<SwordKind, { ang: number; hand: number; dist: number; back: boolean }> = {
+  dagger: { ang: 2.0, hand: 2.0, dist: 5.5, back: false },
+  rapier: { ang: 2.55, hand: 2.1, dist: 5.5, back: false },
+  katana: { ang: Math.PI - 0.55, hand: 1.75, dist: 6, back: false },
+  katar: { ang: 1.7, hand: 2.0, dist: 5.5, back: false },
+  whip: { ang: 1.9, hand: 2.1, dist: 5.5, back: false },
+  plasma: { ang: 1.75, hand: 2.2, dist: 5, back: false },
+  saber: { ang: 2.4, hand: 2.0, dist: 5.5, back: false },
+  longsword: { ang: 2.05, hand: -1.15, dist: 6, back: true },
+  cleaver: { ang: 1.95, hand: -1.25, dist: 5, back: true },
+  greatsword: { ang: -Math.PI * 0.82, hand: -1.45, dist: 5, back: true },
+  nodachi: { ang: 2.3, hand: -2.15, dist: 4, back: true },
+  scythe: { ang: -2.25, hand: 0.9, dist: 2.5, back: true },
+  spear: { ang: -2.0, hand: 0.6, dist: 3, back: true },
+  twinblade: { ang: -2.3, hand: 0.7, dist: 2, back: true },
+};
+
 const HEAVY: Partial<Record<SwordKind, true>> = { greatsword: true, scythe: true, cleaver: true, nodachi: true };
 const WHIP_N = 10;
 
@@ -1104,6 +1127,8 @@ export class SwordCtl {
   restAim = 0;
   /** where the whole body faces (the gun's aim); the resting blade follows it, not the threat */
   bodyAim: number | null = null;
+  /** both hands are on a long gun: the blade rides on the body (back, hip, belt) instead of in a hand */
+  stowed = false;
   /** which way the body faces (+1 right, -1 left) and the smoothed blend between the two */
   facing = 1;
   faceK = 1;
@@ -1265,6 +1290,11 @@ export class SwordCtl {
   /** rest pose for a body facing right, given the aim folded into the right half */
   private restRight(aimR: number, time: number, spinDir: number): { ang: number; hand: number; dist: number } {
     const t = Math.max(-1.3, Math.min(1.3, angDiff(0, aimR))) * LEAN[this.def.kind];
+    if (this.stowed) {
+      // carried on the body while both hands hold the gun: across the back, or at the hip
+      const st = STOW[this.def.kind];
+      return { ang: st.ang + t * 0.15, hand: st.hand, dist: st.dist };
+    }
     switch (this.def.kind) {
       case 'dagger': {
         let spin = 0;
