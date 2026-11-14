@@ -85,7 +85,7 @@ function unlockedWorld(id: number) {
 }
 
 function newDemo() {
-  run = new Run(g, loadout(), null, null, true, mouseWorld);
+  run = new Run(g, loadout(), input, null, true, mouseWorld);
 }
 
 const ui = new UI({
@@ -198,8 +198,9 @@ function frame(now: number) {
     if (!paused) run.update(dt);
     else input.clearPresses();
   } else {
-    input.clearPresses();
+    // the lobby cube takes the slash button (parry practice); everything else is ignored
     run.update(dt);
+    input.clearPresses();
     // keep the showcase cube in the free part of the screen
     const off = panelSide === 'right' ? W * 0.27 : 0;
     run.camX = off;

@@ -693,22 +693,16 @@ export class Run {
       const sp = 110;
       this.enemyShot(Math.cos(a) * R, Math.sin(a) * R, -Math.cos(a) * sp, -Math.sin(a) * sp, 8, 2.5, 0xb36cff);
     }
-    // auto-parry incoming bullets at the right moment, otherwise slash a dummy now and then
-    for (const s of this.shots) {
-      if (s.friendly) continue;
-      const d = Math.hypot(s.x - p.x, s.y - p.y);
-      if (d < p.sword.reach() + 10 && d > p.sword.reach() - 6) {
-        p.autoAttack(Math.atan2(s.y - p.y, s.x - p.x));
-      }
-    }
-    if (this.demoT <= 0) {
-      this.demoT = rand(1.3, 2.2);
-      const e = this.enemies[randi(0, this.enemies.length - 1)];
-      if (e) {
-        const a = Math.atan2(e.y - p.y, e.x - p.x);
-        if (Math.hypot(e.x, e.y) < p.sword.reach() + 30) p.autoAttack(a);
-        else p.autoAttack(p.gun.aim);
-      }
+    // the gun keeps firing on its own; the blade is yours: Space / click slashes toward the mouse
+    // (or the incoming bullet when the mouse is idle), so the parry has to be timed by hand
+    if (this.input && this.input.take('slash')) {
+      let a = p.gun.aim;
+      if (this.input.mouseAiming()) {
+        const [wx, wy] = this.mouseWorld();
+        a = Math.atan2(wy - p.y, wx - p.x);
+      } else a = this.threatAngle(p.x, p.y, p.gun.aim);
+      p.swordAim = a;
+      p.autoAttack(a);
     }
   }
 
@@ -791,6 +785,7 @@ export class Run {
           const a = Math.atan2(s.y - p.y, s.x - p.x);
           if (p.sword.guards(a)) this.reflect(s, p.sword.perfect());
           else if (p.inv <= 0 && !p.dead) {
+            if (this.demo) this.fx.sparks(s.x, s.y, a, 0.8, 5, 90, s.c, 0xffffff, 0.2);
             this.hurtPlayer(s.dmg, a);
             s.life = 0;
           }
