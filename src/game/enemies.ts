@@ -40,7 +40,7 @@ export const SPECS: Record<EType, Spec> = {
   splitter: { r: 6, hp: 20, spd: 38, dmg: 9, range: 13, windup: 0.5, color: 0xff5ad0, xp: 1, gold: 0.3, mass: 1.2 },
   shard: { r: 3.5, hp: 6, spd: 70, dmg: 6, range: 10, windup: 0.32, color: 0xff8ae0, xp: 1, gold: 0.1, mass: 0.6 },
   golem: { r: 18, hp: 3400, spd: 22, dmg: 26, range: 60, windup: 0.9, color: 0xff7a2a, xp: 80, gold: 220, mass: 40 },
-  duelist: { r: 11, hp: 7200, spd: 56, dmg: 24, range: 40, windup: 0.5, color: 0xb08aff, xp: 150, gold: 520, mass: 30 },
+  duelist: { r: 12, hp: 7200, spd: 56, dmg: 24, range: 40, windup: 0.5, color: 0xb08aff, xp: 150, gold: 520, mass: 30 },
 };
 
 const BOSSES: EType[] = ['warden', 'overlord', 'golem', 'duelist'];
@@ -844,13 +844,14 @@ export class Enemy {
         g.quad(x, y, ang, -r, -r, r * 2, 3, lite);
         g.quad(x, y, ang, -r, r - 3, r * 2, 3, dark);
         g.quad(x, y, -ang * 1.6, -r * 0.45, -r * 0.45, r * 0.9, r * 0.9, final ? 0x2a0a14 : 0x0a1430);
-        // eye
+        // a glowing diamond core
         const p = 0.5 + 0.5 * Math.sin(time * 5);
-        g.disc(x, y, r * 0.22, flash ? 0xffffff : final ? 0xff4060 : 0x8adfff);
+        const cr = r * 0.26;
+        g.quad(x, y, ang * 2 + Math.PI / 4, -cr, -cr, cr * 2, cr * 2, flash ? 0xffffff : final ? 0xff4060 : 0x8adfff);
         g.glow(x, y, r * 1.6, c, 0.3 + p * 0.2 + (wind ? 0.4 : 0));
         if (final) for (let i = 0; i < 4; i++) {
           const a = ang * 2 + (i * TAU) / 4;
-          g.disc(x + Math.cos(a) * (r + 6), y + Math.sin(a) * (r + 6), 2, 0xff8aa0);
+          g.quad(x + Math.cos(a) * (r + 6), y + Math.sin(a) * (r + 6), a, -2, -2, 4, 4, 0xff8aa0);
         }
         break;
       }
@@ -931,98 +932,66 @@ export class Enemy {
         break;
       }
       case 'golem': {
+        // a heavy octagon of iron around a molten core
         const enr = this.hp < this.max * 0.5;
         const iron = flash ? 0xffffff : this.state === 'stun' ? 0x4a4450 : 0x4a3a34;
-        const ironD = flash ? 0xffffff : 0x2a201c;
         const lava = enr ? 0xffd060 : 0xff7a2a;
         const pulse = 0.5 + 0.5 * Math.sin(time * 4);
-        g.quad(x, y, 0, -r - 2, -r - 2, r * 2 + 4, r * 2 + 4, outline);
-        g.quad(x, y, 0, -r, -r, r * 2, r * 2, iron);
-        g.quad(x, y, 0, -r, -r, r * 2, 3, mix(iron, 0xffffff, 0.18));
-        g.quad(x, y, 0, -r, r - 4, r * 2, 4, ironD);
-        // lava seams across the plates
-        g.line(x - r + 3, y - 4, x - 2, y + 2, lava, 0.9);
-        g.line(x - 2, y + 2, x + 5, y - 1, lava, 0.9);
-        g.line(x + 5, y - 1, x + r - 3, y + 6, lava, 0.9);
-        g.line(x - 6, y + 8, x + 2, y + r - 4, lava, 0.7);
-        // eye slit
-        g.rect(x - 7, y - 9, 14, 3, 0x120806);
-        g.rect(x - 6 + Math.cos(f) * 2, y - 8.5, 12, 2, flash ? 0xffffff : lava);
-        g.glow(x, y - 8, 14, lava, 0.4 + pulse * 0.2 + (wind ? 0.4 : 0));
-        g.glow(x, y, r * 1.6, 0xff5a20, 0.06 + pulse * 0.05);
-        // fists hang at the sides: hauled overhead for the slam, swung around for the sweep
-        const mode = this.state === 'windup' || this.state === 'strike' ? this.pattern : -1;
-        const sk = this.state === 'strike' ? clamp(this.t / 0.15, 0, 1) : 0;
-        for (const side of [-1, 1]) {
-          let fx2 = x + side * (r + 7), fy2 = y + 5 + Math.sin(time * 3 + side) * 1.2;
-          if (mode === 0) {
-            const up = this.state === 'windup' ? k : 1 - sk;
-            fx2 = x + side * (r + 4 - up * 6);
-            fy2 = y + 5 - up * (r + 8);
-          } else if (mode === 1) {
-            // both fists travel around the front of the body along the sweep
-            const sweep = this.state === 'windup' ? -k * 0.6 : -0.6 + sk * 2.4;
-            const fa = this.atk + side * (1.6 - (side > 0 ? sweep : -sweep) * 0.5);
-            fx2 = x + Math.cos(fa) * (r + 8);
-            fy2 = y + 4 + Math.sin(fa) * (r + 8) * 0.8;
-          }
-          g.quad(fx2, fy2, 0, -6.5, -6.5, 13, 13, outline);
-          g.quad(fx2, fy2, 0, -5.5, -5.5, 11, 11, iron);
-          g.quad(fx2, fy2, 0, -5.5, -5.5, 11, 2, mix(iron, 0xffffff, 0.2));
-          g.rect(fx2 - 4, fy2 + 1, 8, 1, lava, 0.8);
-          g.glow(fx2, fy2, 8, lava, 0.1 + pulse * 0.08 + (wind ? 0.25 : 0));
-        }
+        // the sweep winds the whole body back, then spins it through
+        let rot = this.spin * 0.04;
+        if (this.pattern === 1 && wind) rot += -k * 0.9;
+        else if (this.pattern === 1 && this.state === 'strike') rot += -0.9 + clamp(this.t / 0.15, 0, 1) * 3.2;
+        const charge = wind && this.pattern === 0 ? k : 0;
+        ngon(g, x, y, r + 2, 8, rot, outline);
+        ngon(g, x, y, r, 8, rot, iron);
+        ngon(g, x - 1, y - 2, r * 0.82, 8, rot, mix(iron, 0xffffff, 0.12));
+        ngon(g, x, y, r * 0.62, 8, rot + Math.PI / 8, 0x1e1410);
+        ngon(g, x, y, r * (0.4 + charge * 0.14), 8, -rot * 2, flash ? 0xffffff : mix(0x8a2a08, lava, 0.5 + pulse * 0.5));
+        ngon(g, x, y, r * 0.18, 4, rot * 3, flash ? 0xffffff : 0xfff0c0);
+        if (enr) ngonRing(g, x, y, r + 4, 8, rot, lava, 0.7);
+        g.glow(x, y, r * 1.2, lava, 0.25 + pulse * 0.15 + charge * 0.5);
         break;
       }
       case 'duelist': {
+        // a long, blade-like rhombus that always points where it means to cut
         const enr = this.hp < this.max * 0.5;
         const guard = this.guarding();
-        const a = this.state === 'chase' ? f : this.atk;
-        const robe = flash ? 0xffffff : this.state === 'stun' ? 0x5a5070 : 0x2a2240;
-        const trim = flash ? 0xffffff : c;
-        // cape trailing away from where it looks
-        const ba = a + Math.PI;
-        g.tri(x - 3, y - 6, x + 3, y - 6, x + Math.cos(ba) * 13 + Math.sin(time * 6) * 1.5, y + 8 + Math.sin(ba) * 4, 0x1a1428);
-        g.quad(x, y, 0, -r * 0.6 - 1.2, -r - 1.2, r * 1.2 + 2.4, r * 2 + 2.4, outline);
-        g.quad(x, y, 0, -r * 0.6, -r, r * 1.2, r * 2, robe);
-        g.quad(x, y, 0, -r * 0.6, -r, r * 1.2, 2, trim);
-        g.quad(x, y, 0, -r * 0.6, 1, r * 1.2, 1.5, trim);
-        // a scarf streaming behind
-        for (let i = 0; i < 2; i++) {
-          const w0 = Math.sin(time * 9 + i * 1.7) * 2;
-          const sx = x + Math.cos(ba) * (8 + i * 3), sy = y - r * 0.3 + Math.sin(ba) * 3 + w0 + i * 2;
-          g.beam(x, y - r * 0.3, sx, sy, 1.8 - i * 0.5, enr ? 0xff4a6a : 0x8a3aff);
+        let a = this.state === 'chase' ? f : this.atk;
+        // every cut of the combo whips the body across
+        if (this.state === 'strike' && this.pattern === 0) {
+          const since = this.t - this.comboAt(Math.max(0, this.sub - 1));
+          const side = (this.sub - 1) % 2 ? -1 : 1;
+          if (this.sub > 0 && since < 0.12) a += side * (1 - since / 0.12) * 1.2;
         }
-        // a pale mask with one bright eye under a wide hat
-        g.quad(x, y - r * 0.55, 0, -3.5, -2.5, 7, 5, flash ? 0xffffff : 0xe8e0f4);
-        g.px(x + (Math.cos(a) > 0 ? 1 : -2), y - r * 0.6, enr ? 0xff4a6a : 0x8a5aff);
-        g.glow(x + (Math.cos(a) > 0 ? 1 : -2), y - r * 0.6, 5, enr ? 0xff4a6a : 0x8a5aff, 0.6);
-        g.ellipse(x, y - r - 0.5, r * 1.15, 2.6, outline);
-        g.ellipse(x, y - r - 0.5, r * 1.05, 1.8, 0x1a1428);
-        g.quad(x, y - r - 3, 0, -4, -3, 8, 4, 0x1a1428);
-        g.rect(x - 4, y - r - 1.5, 8, 1, trim);
-        if (enr) g.ring(x, y - r - 6, 4, 1, 0xff6a8a, 0.8);
-        // the blade
-        const ga = guard ? a - Math.PI / 2 : this.state === 'strike' ? a : a + 2.2;
-        const hx = x + Math.cos(a) * 4, hy = y + 1 + Math.sin(a) * 3;
-        const L = 17;
-        const ex = hx + Math.cos(ga) * L, ey = hy + Math.sin(ga) * L;
-        g.beam(hx, hy, ex, ey, 1.3, 0x0c0a14);
-        g.line(hx, hy, ex, ey, flash ? 0xffffff : 0xf0ecff);
-        if (this.state === 'strike' || guard) g.glowLine(hx, hy, ex, ey, 3, 0xb08aff, guard ? 0.45 : 0.3);
+        const hue = enr ? 0xff6a8a : c;
+        const body2 = flash ? 0xffffff : this.state === 'stun' ? 0x5a5070 : 0x2a2240;
+        const edge = flash ? 0xffffff : hue;
+        g.poly(rhomb(x, y, r * 1.8 + 1.5, r * 0.8 + 1.5, r * 1.2 + 1.5, a), outline);
+        g.poly(rhomb(x, y, r * 1.8, r * 0.8, r * 1.2, a), edge);
+        g.poly(rhomb(x, y, r * 1.4, r * 0.55, r * 0.9, a), body2);
+        g.poly(rhomb(x, y, r * 0.55, r * 0.28, r * 0.35, a), flash ? 0xffffff : 0xf0ecff);
+        // two small shards orbit it
+        for (let i = 0; i < (enr ? 3 : 2); i++) {
+          const oa = time * (enr ? 3 : 2) + (i * TAU) / (enr ? 3 : 2);
+          const ox = x + Math.cos(oa) * (r + 7), oy = y + Math.sin(oa) * (r + 7) * 0.8;
+          g.poly(rhomb(ox, oy, 3.5, 1.4, 2, oa + Math.PI / 2), hue);
+        }
+        if (this.state === 'strike' && !guard) g.glowLine(x - Math.cos(a) * r, y - Math.sin(a) * r, x + Math.cos(a) * r * 1.7, y + Math.sin(a) * r * 1.7, 3, hue, 0.35);
         if (guard) {
-          const sh = 0.4 + 0.25 * Math.sin(time * 18);
-          g.arc(x, y, r + 7, 2, a - 1.3, a + 1.3, 0xd8c8ff, sh);
-          g.glow(x + Math.cos(a) * (r + 6), y + Math.sin(a) * (r + 6), 14, 0xb08aff, 0.35 + this.guardCd * 2);
+          // a hexagonal ward in front of it
+          const sh = 0.55 + 0.25 * Math.sin(time * 18);
+          ngonRing(g, x, y, r + 9, 6, a + Math.PI / 6, 0xd8c8ff, 0.9);
+          ngonRing(g, x, y, r + 11, 6, a + Math.PI / 6, 0xb08aff, sh);
+          g.glow(x + Math.cos(a) * (r + 8), y + Math.sin(a) * (r + 8), 14, 0xb08aff, 0.35 + this.guardCd * 2);
         }
-        g.glow(x, y, r * 2, c, 0.15 + (wind ? 0.3 : 0));
+        g.glow(x, y, r * 2, hue, 0.15 + (wind ? 0.3 : 0));
         if (this.state === 'windup' && this.pattern === 3)
           for (let i = 0; i < this.marks.length; i += 2) {
             const mx = this.marks[i], my = this.marks[i + 1];
             const da = Math.atan2(this.ty - my, this.tx - mx);
             const bob2 = Math.sin(time * 8 + i) * 1.5;
-            g.beam(mx - Math.cos(da) * 6, my - Math.sin(da) * 6 - 8 + bob2, mx + Math.cos(da) * 5, my + Math.sin(da) * 5 - 8 + bob2, 1, 0xf0ecff);
-            g.glow(mx, my - 8 + bob2, 8, 0xb08aff, 0.5);
+            g.poly(rhomb(mx, my - 6 + bob2, 7, 1.8, 4, da), 0xf0ecff);
+            g.glow(mx, my - 6 + bob2, 8, 0xb08aff, 0.5);
           }
         break;
       }
@@ -1072,6 +1041,24 @@ function angleTo(a: number, b: number) {
   if (d > Math.PI) d -= TAU;
   if (d < -Math.PI) d += TAU;
   return d;
+}
+
+function ngon(g: Gfx, x: number, y: number, r: number, n: number, rot: number, c: number, a = 1) {
+  const pts: number[] = [];
+  for (let i = 0; i < n; i++) pts.push(x + Math.cos(rot + (i * TAU) / n) * r, y + Math.sin(rot + (i * TAU) / n) * r);
+  g.poly(pts, c, a);
+}
+function ngonRing(g: Gfx, x: number, y: number, r: number, n: number, rot: number, c: number, a = 1) {
+  for (let i = 0; i < n; i++) {
+    const a0 = rot + (i * TAU) / n, a1 = rot + ((i + 1) * TAU) / n;
+    g.line(x + Math.cos(a0) * r, y + Math.sin(a0) * r, x + Math.cos(a1) * r, y + Math.sin(a1) * r, c, a);
+  }
+}
+/** a rhombus: front tip, half width, back tip */
+function rhomb(x: number, y: number, front: number, half: number, back: number, a: number) {
+  const cs = Math.cos(a), sn = Math.sin(a);
+  const P = (u: number, v: number) => [x + u * cs - v * sn, y + u * sn + v * cs];
+  return [...P(front, 0), ...P(0, half), ...P(-back, 0), ...P(0, -half)];
 }
 
 /** a flashing danger fan on the floor */

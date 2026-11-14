@@ -1093,8 +1093,8 @@ export class Run {
       if (s.kind === 'blade') {
         const a = Math.atan2(s.vy, s.vx);
         const ca = Math.cos(a), sa = Math.sin(a);
-        g.beam(s.x - ca * 8, s.y - sa * 8, s.x + ca * 3, s.y + sa * 3, 1.6, s.friendly ? 0xffe46a : 0xf0ecff);
-        g.beam(s.x - ca * 9, s.y - sa * 9, s.x - ca * 7, s.y - sa * 7, 2.6, 0x4a3a6a);
+        const col = s.friendly ? 0xffe46a : 0xf0ecff;
+        g.poly([s.x + ca * 4, s.y + sa * 4, s.x - sa * 1.8 - ca * 2, s.y + ca * 1.8 - sa * 2, s.x - ca * 9, s.y - sa * 9, s.x + sa * 1.8 - ca * 2, s.y - ca * 1.8 - sa * 2], col);
         g.glow(s.x, s.y, 12, s.c, 0.5);
         continue;
       }
