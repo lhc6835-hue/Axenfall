@@ -7,6 +7,7 @@ import {
 } from '../game/data';
 import { buy, catalog, checkTimedRestock, persist, priceOf, purchasable, rerollCost, reroll, resetSave, save, type ShopCat, type Slot } from '../game/save';
 import type { RunResult } from '../game/run';
+import { WORLDS } from '../game/worlds';
 import { canFullscreen, enterFullscreen, exitFullscreen } from './fullscreen';
 import { cloud, errorText, signIn, signOut, syncNow, type ConflictChoice, type Summary } from '../net/cloud';
 
@@ -14,6 +15,7 @@ export interface AppApi {
   startRun(): void;
   preview(o: { gun?: GunDef; sword?: SwordDef; skin?: SkinDef } | null): void;
   refreshDemo(): void;
+  pickWorld(id: number): void;
   setPanelSide(side: 'none' | 'right'): void;
   resume(): void;
   quitRun(): void;
@@ -242,6 +244,13 @@ export class UI {
         <span class="tag sword">${swordById(eq.sword).name}</span>
         <span class="tag skin">${skinById(eq.skin).name}</span>
       </div>
+      <div class="worlds">${WORLDS.map((wd) => {
+        const locked = wd.id > save.cleared + 1;
+        const sel = !locked && wd.id === (save.world <= save.cleared + 1 ? save.world : 1);
+        const done = wd.id <= save.cleared;
+        return `<button class="world w${wd.id}${sel ? ' sel' : ''}${locked ? ' locked' : ''}" data-w="${wd.id}"${locked ? ' disabled' : ''}>
+          <i>WORLD ${wd.id}</i><b>${wd.name}</b><small>${locked ? `월드 ${wd.id - 1} 클리어 시 해금` : done ? '클리어' : wd.sub}</small></button>`;
+      }).join('')}</div>
       <div class="menu">
         <button class="btn primary" data-a="go">출격</button>
         <button class="btn" data-a="shop">상점</button>
@@ -254,6 +263,14 @@ export class UI {
         총은 자동 사격 · 적의 <em>!</em> 신호에 맞춰 베면 패리 · 공격 직전에 베면 <em>PERFECT</em>
       </div>`;
     w.querySelector<HTMLElement>('[data-a=go]')!.onclick = () => { sfx.ui(); this.app.startRun(); };
+    w.querySelectorAll<HTMLButtonElement>('.world').forEach((b) => {
+      b.onclick = () => {
+        if (b.disabled || b.classList.contains('sel')) return;
+        sfx.ui();
+        this.app.pickWorld(Number(b.dataset.w));
+        w.querySelectorAll('.world').forEach((o) => o.classList.toggle('sel', o === b));
+      };
+    });
     w.querySelector<HTMLElement>('[data-a=shop]')!.onclick = () => { sfx.ui(); this.shop(); };
     w.querySelector<HTMLElement>('[data-a=loadout]')!.onclick = () => { sfx.ui(); this.loadout(); };
     w.querySelector<HTMLElement>('[data-a=opt]')!.onclick = () => { sfx.ui(); this.options(); };
@@ -553,7 +570,7 @@ export class UI {
     root().appendChild(m);
   }
 
-  result(r: RunResult, bonus: number, onDone: () => void) {
+  result(r: RunResult, bonus: number, note: string, onDone: () => void) {
     this.clear();
     const m = el('div', 'modal');
     const t = `${Math.floor(r.time / 60)}분 ${Math.floor(r.time % 60)}초`;
@@ -568,6 +585,7 @@ export class UI {
         <div><i>보너스</i><b>+${fmt(bonus)}</b></div>
       </div>
       <div class="total"><b class="coin"></b> +${fmt(r.gold + bonus)} <span>보유 ${fmt(save.gold)}</span></div>
+      ${note ? `<p class="unlock">${note}</p>` : ''}
       <p class="sub">상점에 새 물품 입고</p>
       <button class="btn primary" data-a="ok">로비로</button>
     </div>`;

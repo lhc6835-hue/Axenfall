@@ -4,7 +4,8 @@ All clips were trimmed, normalised and re-encoded to MP3 for this game.
 
 ## Music — CC0 1.0
 - **Komiku** — "Action Discovery" (`bgm/lobby.mp3`), "Battle Theme" (`bgm/battle.mp3`),
-  "Boss 1: The first challenge" (`bgm/boss1.mp3`), "Last Boss: Let's see what we got" (`bgm/boss2.mp3`).
+  "Boss 1: The first challenge" (`bgm/boss1.mp3`), "Last Boss: Let's see what we got" (`bgm/boss2.mp3`),
+  "Ancient Heavy Tech Donjon" (`bgm/battle2.mp3`), "Boss 2: Too powerful for you, run!" (`bgm/boss3.mp3`), "Final Fight" (`bgm/boss4.mp3`).
   Via the SoundSafari CC0-1.0-Music collection.
 
 ## Sound effects

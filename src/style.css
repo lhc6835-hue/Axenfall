@@ -88,6 +88,27 @@ button { font-family: inherit; cursor: pointer; }
 .tag.sword { color: var(--sword); }
 .tag.skin { color: var(--body); }
 .menu { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; justify-content: center; }
+.worlds { display: flex; gap: 8px; margin-top: 10px; justify-content: center; flex-wrap: wrap; }
+.world {
+  display: grid; text-align: left; gap: 1px; min-width: 150px; padding: 6px 12px 7px; color: var(--ink);
+  background: rgba(10, 8, 20, .7); border: 2px solid #2e2748; border-radius: 4px; box-shadow: 0 3px 0 #0a0814;
+  transition: border-color .12s, background .12s, transform .06s;
+}
+.world i { font-style: normal; font-size: 10px; letter-spacing: .14em; color: var(--dim); }
+.world b { font-family: 'Galmuri11B', monospace; font-size: 15px; font-weight: normal; }
+.world small { font-size: 11px; color: var(--dim); }
+.world:hover:not(:disabled) { border-color: #5a4ea0; }
+.world.sel { border-color: #b8a8ff; background: rgba(40, 32, 80, .78); box-shadow: 0 3px 0 #0a0814, 0 0 14px #8a7aff44; }
+.world.w2.sel { border-color: #ff9a50; background: rgba(60, 28, 14, .8); box-shadow: 0 3px 0 #0a0814, 0 0 16px #ff6a2055; }
+.world.w2 b { color: #ffc090; }
+.world.locked { opacity: .45; cursor: not-allowed; filter: grayscale(.7); }
+@media (max-height: 500px) {
+  .worlds { margin-top: 6px; gap: 6px; }
+  .world { min-width: 0; padding: 4px 10px; display: flex; align-items: baseline; gap: 6px; }
+  .world small { display: none; }
+  .world b { font-size: 13px; }
+}
+.modal .unlock { margin: 10px 0 0; font-family: 'Galmuri11B', monospace; color: #ffb070; font-size: 15px; text-shadow: 0 0 10px #ff6a2088; }
 .best { margin-top: 10px; font-size: 12px; color: var(--dim); }
 .help { margin-top: 8px; font-size: 12px; color: #b8b0d8; text-align: center; line-height: 1.7; background: rgba(0,0,0,.35); padding: 6px 12px; border-radius: 4px; }
 .help em { color: var(--accent); font-style: normal; }

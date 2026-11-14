@@ -4,6 +4,7 @@ import { sfx } from '../engine/audio';
 import type { Input } from '../engine/input';
 import { FX, PK } from './fx';
 import { Enemy, type EType } from './enemies';
+import { worldById, type WorldDef } from './worlds';
 import { Player } from './player';
 import { UPGRADES, baseMods, type GunDef, type Mods, type SkinDef, type SwordDef, type Upgrade } from './data';
 import type { SwordCtl } from './weapons';
@@ -22,6 +23,23 @@ export interface Shot {
   hit: Set<Enemy> | null;
   px: number;
   py: number;
+  /** how it is drawn */
+  kind?: 'crescent' | 'blade';
+  /** lobbed shells fly over everything and burst where they land */
+  lob?: { sx: number; sy: number; tx: number; ty: number; t: number; dur: number; n: number; z: number };
+}
+
+/** an expanding shockwave ring; parried by facing it, or dashed through */
+interface Wave {
+  x: number;
+  y: number;
+  r: number;
+  v: number;
+  max: number;
+  dmg: number;
+  c: number;
+  hit: boolean;
+  cut: number;
 }
 
 interface Drop {
@@ -41,6 +59,7 @@ export interface Loadout {
   sword: SwordDef;
   swordLvl: number;
   skin: SkinDef;
+  world?: number;
 }
 
 export interface RunResult {
@@ -51,6 +70,7 @@ export interface RunResult {
   gold: number;
   parries: number;
   perfects: number;
+  world: number;
 }
 
 export interface Hooks {
@@ -67,7 +87,9 @@ export class Run {
   fx = new FX();
   enemies: Enemy[] = [];
   shots: Shot[] = [];
+  waves: Wave[] = [];
   drops: Drop[] = [];
+  world: WorldDef;
   mods: Mods = baseMods();
   upLv: Record<string, number> = {};
   player: Player;
@@ -114,6 +136,7 @@ export class Run {
     public demo: boolean,
     public mouseWorld: () => [number, number],
   ) {
+    this.world = worldById(load.world ?? 1);
     this.player = new Player(this, load.gun, load.gunLvl, load.sword, load.swordLvl, load.skin);
     if (demo) this.setupDemo();
   }
@@ -186,6 +209,41 @@ export class Run {
   damageEnemy(e: Enemy, dmg: number, kx: number, ky: number, crit: boolean, src: 'gun' | 'sword' | 'parry' | 'shot'): boolean {
     if (e.dead) return false;
     if (e.z > 20) return false;
+    if (src === 'gun' || src === 'shot') {
+      const p = this.player;
+      const from = src === 'shot' ? Math.atan2(-ky, -kx) : Math.atan2(p.y - e.y, p.x - e.x);
+      if (e.guarding()) {
+        this.guardBlock(e, from);
+        return false;
+      }
+      if (e.blocks(from)) {
+        // the shield turns most of it
+        dmg *= 0.15;
+        kx *= 0.3;
+        ky *= 0.3;
+        if (e.guardCd <= 0) {
+          e.guardCd = 0.22;
+          const bx = e.x + Math.cos(from) * (e.r + 3), by = e.y + Math.sin(from) * (e.r + 3);
+          this.fx.sparks(bx, by, from, 0.9, 4, 130, 0xdfe8ff, 0xffffff, 0.15);
+          this.fx.pop(e.x, e.y - e.r - 4, '막음', '#bcd0ee', 0.8);
+          sfx.click(1.6);
+        }
+      }
+    } else if (src === 'sword' && e.guarding()) {
+      // a blade breaks the guard wide open
+      e.stun = 2.4;
+      e.state = 'stun';
+      e.t = 0;
+      dmg *= 2.5;
+      crit = true;
+      this.fx.pop(e.x, e.y - e.r - 8, '가드 브레이크!', '#ffe46a', 1.6, true);
+      this.fx.ring(e.x, e.y, 4, 40, 0.35, 0xd8c8ff, 3);
+      this.fx.sparks(e.x, e.y, 0, Math.PI, 20, 220, 0xd8c8ff, 0xffffff, 0.35);
+      this.hitstop(0.14);
+      this.flash(0.3, 0xe8dcff);
+      this.shake(6);
+      sfx.parry(true);
+    }
     e.hp -= dmg;
     e.flash = src === 'gun' ? 0.05 : 0.1;
     const m = Math.sqrt(e.spec.mass);
@@ -201,6 +259,21 @@ export class Run {
       return true;
     }
     return false;
+  }
+
+  /** the duelist cuts a bullet out of the air and sends one back */
+  guardBlock(e: Enemy, from: number) {
+    const bx = e.x + Math.cos(from) * (e.r + 5), by = e.y + Math.sin(from) * (e.r + 5);
+    this.fx.sparks(bx, by, from, 0.8, 3, 140, 0xd8c8ff, 0xffffff, 0.15);
+    if (e.guardCd > 0) return;
+    e.guardCd = 0.3;
+    e.flash = 0.04;
+    this.fx.flare(bx, by, 6, 0xe8dcff, 0.07);
+    this.fx.pop(e.x, e.y - e.r - 6, '튕겨냄', '#d8c8ff', 0.9);
+    sfx.reflect();
+    const p = this.player;
+    const a = Math.atan2(p.y - e.y, p.x - e.x);
+    this.enemyShot(bx, by, Math.cos(a) * 165, Math.sin(a) * 165, e.dmg * 0.45, 2.5, 0xd8c8ff);
   }
 
   kill(e: Enemy, kx: number, ky: number) {
@@ -220,12 +293,25 @@ export class Run {
     fx.smoke(e.x, e.y, e.boss ? 14 : 2, 0x3a3448, e.boss ? 6 : 3, 0.8);
     if (e.boss || e.type === 'brute') fx.ring(e.x, e.y, e.r, e.r * 3, 0.35, c, 3);
     sfx.kill();
+    if (e.type === 'splitter') {
+      // splits into quick little shards
+      const n = e.elite ? 3 : 2;
+      for (let i = 0; i < n; i++) {
+        const sa = a + Math.PI / 2 + (i / n) * TAU;
+        const sh = new Enemy('shard', e.x + Math.cos(sa) * 4, e.y + Math.sin(sa) * 4, this.scale() * this.world.hp, false);
+        sh.spawnT = 0;
+        sh.kx = Math.cos(sa) * 120;
+        sh.ky = Math.sin(sa) * 120;
+        sh.cd = rand(0.6, 1.0);
+        this.enemies.push(sh);
+      }
+    }
     // drops
     // fewer, meaner enemies: each one is worth more
     const bounty = e.boss ? 1 : 2;
     const xp = e.spec.xp * (e.elite ? 5 : 1) * bounty;
     if (xp > 0) this.drop(e.x, e.y, 'xp', xp);
-    const gc = e.spec.gold * (e.elite ? 12 : 1) * bounty;
+    const gc = e.spec.gold * (e.elite ? 12 : 1) * bounty * this.world.gold;
     let goldN = Math.floor(gc) + (Math.random() < gc % 1 ? 1 : 0);
     if (goldN > 0) {
       const pieces = Math.min(goldN, e.boss ? 30 : 6);
@@ -238,13 +324,15 @@ export class Run {
       this.flash(0.7);
       this.shake(12);
       this.boss = null;
-      if (e.type === 'warden') {
+      const W = this.world;
+      this.waves = [];
+      if (e.type === W.boss1.type) {
         this.bossDone[0] = true;
-        this.hooks?.banner('감시자 격파!', '보상 골드 획득', '#8adfff');
+        this.hooks?.banner(`${W.boss1.name} 격파`, '보상 골드 획득', W.boss1.color);
       } else {
         this.bossDone[1] = true;
         this.won = true;
-        this.hooks?.banner('군주 격파!', '승리', '#ffd25a');
+        this.hooks?.banner(`${W.boss2.name} 격파`, '승리', '#ffd25a');
         this.endRun(true);
       }
     }
@@ -335,7 +423,7 @@ export class Run {
   /** reflect hostile bullets the blade meets during the parry window */
   parryShots(px: number, py: number, radius: number, sword: SwordCtl) {
     for (const s of this.shots) {
-      if (s.friendly) continue;
+      if (s.friendly || s.lob) continue;
       const dx = s.x - px, dy = s.y - py;
       if (dx * dx + dy * dy > radius * radius) continue;
       if (!sword.guards(Math.atan2(dy, dx))) continue;
@@ -405,9 +493,39 @@ export class Run {
     return 2 + Math.floor(this.time / 150);
   }
 
-  enemyShot(x: number, y: number, vx: number, vy: number, dmg: number, r: number, c: number) {
-    if (this.hostileShots() >= this.shotCap()) return;
-    this.shots.push({ x, y, vx, vy, r, dmg, life: 4.5, friendly: false, c, pierce: 0, hit: null, px: x, py: y });
+  enemyShot(x: number, y: number, vx: number, vy: number, dmg: number, r: number, c: number, kind?: Shot['kind'], force = false) {
+    if (!force && this.hostileShots() >= this.shotCap()) return;
+    this.shots.push({ x, y, vx, vy, r, dmg, life: 4.5, friendly: false, c, pierce: 0, hit: null, px: x, py: y, kind });
+  }
+
+  /** a shell lobbed at (tx,ty): it lands after dur seconds and bursts into n bullets */
+  lobShot(sx: number, sy: number, tx: number, ty: number, dmg: number, dur: number, c: number, n: number) {
+    if (this.hostileShots() >= this.shotCap() + 4) return;
+    this.shots.push({
+      x: sx, y: sy, vx: 0, vy: 0, r: 3, dmg, life: dur + 1, friendly: false, c, pierce: 0, hit: null, px: sx, py: sy,
+      lob: { sx, sy, tx, ty, t: 0, dur, n, z: 0 },
+    });
+  }
+
+  wave(x: number, y: number, r0: number, v: number, max: number, dmg: number, c: number) {
+    this.waves.push({ x, y, r: r0, v, max, dmg, c, hit: false, cut: NaN });
+  }
+
+  private burst(s: Shot) {
+    const L = s.lob!;
+    const fx = this.fx;
+    fx.flare(L.tx, L.ty, 8, 0xffe0a0, 0.08);
+    fx.ring(L.tx, L.ty, 2, 16, 0.25, s.c, 2);
+    fx.sparks(L.tx, L.ty, 0, Math.PI, 10, 150, s.c, 0xffffff, 0.3);
+    fx.dust(L.tx, L.ty, 6);
+    fx.light(L.tx, L.ty, 40, s.c, 0.9, 0.18);
+    this.shake(2);
+    sfx.play('slam2', { vol: 0.35, rate: 1.4, jitter: 0.1, gate: 60 });
+    const off = rand(0, TAU);
+    for (let i = 0; i < L.n; i++) {
+      const a = off + (i / L.n) * TAU;
+      this.enemyShot(L.tx, L.ty, Math.cos(a) * 72, Math.sin(a) * 72, s.dmg, 2.5, s.c, undefined, true);
+    }
   }
 
   hurtPlayer(dmg: number, fromAng: number) {
@@ -486,23 +604,24 @@ export class Run {
 
   spawn(type: EType, elite = false, x?: number, y?: number) {
     const [sx, sy] = x === undefined ? this.spawnPos() : [x, y!];
-    const e = new Enemy(type, sx, sy, this.scale(), elite);
+    const e = new Enemy(type, sx, sy, this.scale() * this.world.hp, elite);
     this.enemies.push(e);
     return e;
   }
 
   private director(dt: number) {
     const t = this.time;
+    const W = this.world;
     if (!this.boss && !this.bossDone[0] && t >= BOSS1_AT) {
-      this.boss = this.spawn('warden');
-      this.boss.hp = this.boss.max = 2200 * (1 + this.level * 0.03);
-      this.hooks?.banner('보스 출현', '감시자 큐브', '#8adfff');
+      this.boss = this.spawn(W.boss1.type);
+      this.boss.hp = this.boss.max = W.boss1.hp * (1 + this.level * 0.03);
+      this.hooks?.banner('보스 출현', W.boss1.name, W.boss1.color);
       sfx.bossAppear();
     }
     if (!this.boss && !this.bossDone[1] && t >= BOSS2_AT) {
-      this.boss = this.spawn('overlord');
-      this.boss.hp = this.boss.max = 5600 * (1 + this.level * 0.03);
-      this.hooks?.banner('최종 보스', '붉은 군주', '#ff6a80');
+      this.boss = this.spawn(W.boss2.type);
+      this.boss.hp = this.boss.max = W.boss2.hp * (1 + this.level * 0.03);
+      this.hooks?.banner('최종 보스', W.boss2.name, W.boss2.color);
       sfx.bossAppear();
     }
     if (this.swarms.length && t >= this.swarms[0]) {
@@ -511,14 +630,14 @@ export class Run {
       const R = 150;
       for (let i = 0; i < n; i++) {
         const a = (i / n) * TAU;
-        this.spawn(i % 3 === 0 ? 'runner' : 'grunt', false, this.player.x + Math.cos(a) * R, this.player.y + Math.sin(a) * R);
+        this.spawn(i % 3 === 0 ? W.swarm[1] : W.swarm[0], false, this.player.x + Math.cos(a) * R, this.player.y + Math.sin(a) * R);
       }
       this.hooks?.banner('포위', '사방에서 몰려온다', '#ff8a5a');
     }
     this.eliteT -= dt;
     if (this.eliteT <= 0) {
       this.eliteT = rand(50, 70);
-      const types: EType[] = t > 200 ? ['brute', 'dasher', 'caster', 'archer'] : t > 100 ? ['dasher', 'archer', 'grunt'] : ['grunt', 'runner'];
+      const types: EType[] = W.elites(t);
       this.spawn(types[Math.floor(Math.random() * types.length)], true);
     }
     const alive = this.enemies.length;
@@ -534,14 +653,7 @@ export class Run {
 
   private pickType(): EType {
     const t = this.time;
-    const w: [EType, number][] = [
-      ['grunt', 10],
-      ['runner', t > 20 ? 6 : 0],
-      ['archer', t > 50 ? 2 + t / 200 : 0],
-      ['dasher', t > 90 ? 2 + t / 200 : 0],
-      ['brute', t > 130 ? 0.8 + t / 300 : 0],
-      ['caster', t > 200 ? 0.8 + t / 300 : 0],
-    ];
+    const w: [EType, number][] = this.world.pool.map(([k, at, base, grow]) => [k, t >= at ? base + (grow * t) / 100 : 0]);
     let total = 0;
     for (const [, v] of w) total += v;
     let x = Math.random() * total;
@@ -632,7 +744,7 @@ export class Run {
       this.overT -= realDt;
       if (this.overT <= 0 && !this.resultSent) {
         this.resultSent = true;
-        this.hooks?.over({ won: this.won, time: this.time, kills: this.kills, level: this.level, gold: this.gold, parries: this.parries, perfects: this.perfects });
+        this.hooks?.over({ won: this.won, time: this.time, kills: this.kills, level: this.level, gold: this.gold, parries: this.parries, perfects: this.perfects, world: this.world.id });
       }
     }
   }
@@ -651,6 +763,20 @@ export class Run {
 
     // shots
     for (const s of this.shots) {
+      if (s.lob) {
+        const L = s.lob;
+        L.t += dt;
+        const k = Math.min(1, L.t / L.dur);
+        s.x = L.sx + (L.tx - L.sx) * k;
+        s.y = L.sy + (L.ty - L.sy) * k;
+        L.z = Math.sin(k * Math.PI) * 60;
+        if (Math.random() < 0.4) this.fx.spawn(PK.Ember, s.x, s.y - L.z, rand(-8, 8), rand(-8, 8), 0.3, s.c, { c2: 0xffe080 });
+        if (k >= 1) {
+          s.life = 0;
+          this.burst(s);
+        }
+        continue;
+      }
       s.px = s.x;
       s.py = s.y;
       s.x += s.vx * dt;
@@ -681,6 +807,7 @@ export class Run {
       }
     }
     this.shots = this.shots.filter((s) => s.life > 0);
+    this.updateWaves(dt);
 
     // drops
     const mag = this.mods.magnet;
@@ -732,6 +859,32 @@ export class Run {
       sfx.levelUp();
       this.hooks?.levelUp(this.rollUpgrades());
     }
+  }
+
+  private updateWaves(dt: number) {
+    const p = this.player;
+    for (const w of this.waves) {
+      w.r += w.v * dt;
+      if (w.hit || p.dead || this.over) continue;
+      const d = Math.hypot(p.x - w.x, p.y - w.y);
+      if (Math.abs(d - w.r) > 4) continue;
+      w.hit = true;
+      // dashing through the crest is safe
+      if (p.inv > 0) continue;
+      const a = Math.atan2(w.y - p.y, w.x - p.x);
+      if (p.sword.guards(a)) {
+        const s = p.sword;
+        const perfect = s.perfect();
+        this.parries++;
+        if (perfect) this.perfects++;
+        w.cut = Math.atan2(p.y - w.y, p.x - w.x);
+        const cx = p.x + Math.cos(a) * 8, cy = p.y + Math.sin(a) * 8;
+        this.parryFx(cx, cy, a, perfect);
+        s.deflect(a, perfect);
+        this.afterParry(perfect, p.x, p.y);
+      } else this.hurtPlayer(w.dmg, a);
+    }
+    this.waves = this.waves.filter((w) => w.r < w.max);
   }
 
   /** soft separation so the horde reads as a crowd, not a blob */
@@ -787,9 +940,11 @@ export class Run {
     const g = this.g;
     g.ox = Math.round(g.w / 2 - this.camX + this.shakeX + this.kickX);
     g.oy = Math.round(g.h / 2 - this.camY + this.shakeY + this.kickY);
-    g.clear(0x14121f);
+    g.clear(this.world.id === 2 ? 0x120d0b : 0x14121f);
     this.drawFloor();
     this.fx.drawBack(g);
+    this.drawWaves();
+    this.drawLobMarks();
     this.drawDrops();
     for (const e of this.enemies) e.drawFloor(g, this.clock);
     const p = this.player;
@@ -809,23 +964,75 @@ export class Run {
     g.present(ctx);
   }
 
+  private drawWaves() {
+    const g = this.g;
+    for (const w of this.waves) {
+      const fade = Math.min(1, (w.max - w.r) / 30);
+      const gap = 0.32;
+      const segs: [number, number][] = isNaN(w.cut) ? [[0, TAU]] : [[w.cut + gap, w.cut + TAU - gap]];
+      for (const [a0, a1] of segs) {
+        g.arc(w.x, w.y, w.r, 3, a0, a1, mix(w.c, 0x000000, 0.3), 0.55 * fade);
+        g.arc(w.x, w.y, w.r + 1, 1, a0, a1, 0xffe0b0, 0.9 * fade);
+        g.arc(w.x, w.y, w.r - 5, 1, a0, a1, w.c, 0.3 * fade);
+      }
+      // light along the crest
+      const n = Math.max(8, Math.floor(w.r / 6));
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * TAU;
+        if (!isNaN(w.cut) && Math.abs(angDiff(a, w.cut)) < gap) continue;
+        g.glow(w.x + Math.cos(a) * w.r, w.y + Math.sin(a) * w.r, 7, w.c, 0.18 * fade);
+      }
+    }
+  }
+
+  private drawLobMarks() {
+    const g = this.g;
+    const blink = Math.sin(this.clock * 30) > 0;
+    for (const s of this.shots) {
+      if (!s.lob) continue;
+      const L = s.lob;
+      const k = Math.min(1, L.t / L.dur);
+      g.disc(L.tx, L.ty, 9, 0xff3020, 0.08 + k * 0.16, true);
+      g.ring(L.tx, L.ty, 9 * (1 - k) + 2, 1, 0xff9060, 0.9);
+      g.ring(L.tx, L.ty, 10, 1, k > 0.7 && blink ? 0xffd0a0 : 0xa03018, 1);
+      g.ellipse(s.x, s.y + 2, 3 - L.z / 40, 1.2, 0x000000, 0.35, true);
+    }
+  }
+
   private drawFloor() {
     const g = this.g;
     const T = 24;
+    const F = this.world.floor;
+    const hot = this.world.id === 2;
     const x0 = Math.floor((-g.ox) / T) - 1, x1 = Math.ceil((g.w - g.ox) / T) + 1;
     const y0 = Math.floor((-g.oy) / T) - 1, y1 = Math.ceil((g.h - g.oy) / T) + 1;
     for (let ty = y0; ty <= y1; ty++)
       for (let tx = x0; tx <= x1; tx++) {
         const h = hash2(tx, ty);
-        const base = (tx + ty) & 1 ? 0x17152a : 0x1a1830;
-        g.rect(tx * T, ty * T, T, T, h > 0.9 ? mix(base, 0x23203c, 0.6) : base);
-        g.rect(tx * T, ty * T, T, 1, 0x121020);
-        g.rect(tx * T, ty * T, 1, T, 0x121020);
+        const base = (tx + ty) & 1 ? F.a : F.b;
+        g.rect(tx * T, ty * T, T, T, h > 0.9 ? mix(base, F.hi, 0.6) : base);
+        g.rect(tx * T, ty * T, T, 1, F.line);
+        g.rect(tx * T, ty * T, 1, T, F.line);
+        if (hot) {
+          // riveted iron plates with molten seams between some of them
+          g.px(tx * T + 3, ty * T + 3, 0x3a2e28);
+          g.px(tx * T + T - 3, ty * T + 3, 0x3a2e28);
+          g.px(tx * T + 3, ty * T + T - 3, 0x3a2e28);
+          g.px(tx * T + T - 3, ty * T + T - 3, 0x3a2e28);
+          if (h > 0.55 && h < 0.72) {
+            const pulse = 0.55 + 0.45 * Math.sin(this.clock * 2 + tx * 0.7 + ty * 1.3);
+            const vert = h < 0.635;
+            const x0 = tx * T, y0 = ty * T;
+            if (vert) g.rect(x0, y0 + 2, 1, T - 4, mix(0x6a2008, F.seam, pulse));
+            else g.rect(x0 + 2, y0, T - 4, 1, mix(0x6a2008, F.seam, pulse));
+            g.glow(vert ? x0 : x0 + T / 2, vert ? y0 + T / 2 : y0, 14, F.glow, 0.12 * pulse);
+          }
+        }
         g.rect(tx * T + 1, ty * T + 1, T - 1, 1, mix(base, 0xffffff, 0.04));
         if (h < 0.18) {
           const px = tx * T + 4 + Math.floor(hash2(ty, tx) * 14), py = ty * T + 4 + Math.floor(h * 80) % 14;
-          g.px(px, py, 0x2a2644);
-          g.px(px + 1, py, 0x221f38);
+          g.px(px, py, hot ? 0x3a2a22 : 0x2a2644);
+          g.px(px + 1, py, hot ? 0x2e221c : 0x221f38);
         }
         if (h > 0.96) {
           // a hairline crack
@@ -836,8 +1043,8 @@ export class Run {
       }
     if (this.demo) {
       // a soft spotlight under the showcase cube
-      g.glow(0, 4, 90, 0x6a5aff, 0.12);
-      g.ellipse(0, 9, 34, 9, 0x2a2650, 0.35, true);
+      g.glow(0, 4, 90, hot ? 0xff7a2a : 0x6a5aff, 0.12);
+      g.ellipse(0, 9, 34, 9, hot ? 0x4a2a1a : 0x2a2650, 0.35, true);
     }
   }
 
@@ -868,6 +1075,29 @@ export class Run {
   private drawShots() {
     const g = this.g;
     for (const s of this.shots) {
+      if (s.lob) {
+        const y = s.y - s.lob.z;
+        g.disc(s.x, y, 3.2, 0x2a1a14);
+        g.disc(s.x, y, 2.4, s.c);
+        g.disc(s.x - 0.6, y - 0.6, 1, 0xffe0b0);
+        g.glow(s.x, y, 10, s.c, 0.5);
+        continue;
+      }
+      if (s.kind === 'crescent') {
+        const a = Math.atan2(s.vy, s.vx);
+        g.arc(s.x - Math.cos(a) * 4, s.y - Math.sin(a) * 4, 7, 2.5, a - 1.2, a + 1.2, s.friendly ? 0xffe46a : s.c);
+        g.arc(s.x - Math.cos(a) * 3, s.y - Math.sin(a) * 3, 7, 1, a - 0.9, a + 0.9, 0xffffff);
+        g.glow(s.x, s.y, 16, s.c, 0.5);
+        continue;
+      }
+      if (s.kind === 'blade') {
+        const a = Math.atan2(s.vy, s.vx);
+        const ca = Math.cos(a), sa = Math.sin(a);
+        g.beam(s.x - ca * 8, s.y - sa * 8, s.x + ca * 3, s.y + sa * 3, 1.6, s.friendly ? 0xffe46a : 0xf0ecff);
+        g.beam(s.x - ca * 9, s.y - sa * 9, s.x - ca * 7, s.y - sa * 7, 2.6, 0x4a3a6a);
+        g.glow(s.x, s.y, 12, s.c, 0.5);
+        continue;
+      }
       const tx = s.x - s.vx * 0.04, ty = s.y - s.vy * 0.04;
       g.line(tx, ty, s.x, s.y, mix(s.c, 0x000000, 0.3));
       g.disc(s.x, s.y, s.r, s.c);

@@ -7,6 +7,7 @@ import { gunById, skinById, swordById, type GunDef, type SkinDef, type SwordDef 
 import { persist, restock, save } from './game/save';
 import { Run, type Loadout, type RunResult } from './game/run';
 import { drawHud, type Banner } from './ui/hud';
+import { WORLDS, worldById } from './game/worlds';
 import { UI, tickPreviews } from './ui/ui';
 import { openFromBlack, slash, wiping } from './ui/transition';
 import { enterFullscreen, onFullscreenChange } from './ui/fullscreen';
@@ -74,7 +75,13 @@ function loadout(): Loadout {
     sword: previewOv?.sword ?? swordById(save.eq.sword),
     swordLvl: previewOv?.sword ? 0 : save.swords[save.eq.sword] ?? 0,
     skin: previewOv?.skin ?? skinById(save.eq.skin),
+    world: unlockedWorld(save.world),
   };
+}
+
+/** a world can be played once the one before it has been beaten */
+function unlockedWorld(id: number) {
+  return id <= save.cleared + 1 && WORLDS.some((w) => w.id === id) ? id : 1;
 }
 
 function newDemo() {
@@ -88,6 +95,12 @@ const ui = new UI({
     newDemo();
   },
   refreshDemo() {
+    previewOv = null;
+    newDemo();
+  },
+  pickWorld(id) {
+    save.world = unlockedWorld(id);
+    persist();
     previewOv = null;
     newDemo();
   },
@@ -130,14 +143,25 @@ function beginRun() {
       banner = { text, sub, color, t: 2.4 };
     },
   }, false, mouseWorld);
-  banner = { text: '출격!', sub: '10분 생존 또는 최종 보스 처치', color: '#ffe46a', t: 2.4 };
+  const wd = run.world;
+  banner = { text: `월드 ${wd.id} · ${wd.name}`, sub: '10분 생존 또는 최종 보스 처치', color: wd.id === 2 ? '#ffb070' : '#ffe46a', t: 2.4 };
   touchLayer.classList.toggle('on', isTouch);
-  sfx.music('battle');
+  sfx.music(wd.music.battle);
   sfx.runStart();
 }
 
 function finishRun(r: RunResult) {
-  const bonus = Math.floor(r.time / 10) * 2 + (r.won ? 800 : 0) + r.perfects * 3;
+  const wd = worldById(r.world);
+  const bonus = Math.round((Math.floor(r.time / 10) * 2 + (r.won ? 800 : 0) + r.perfects * 3) * wd.gold);
+  let note = '';
+  if (r.won && r.world > save.cleared) {
+    save.cleared = r.world;
+    const next = WORLDS.find((w) => w.id === r.world + 1);
+    if (next) {
+      note = `월드 ${next.id} · ${next.name} 해금`;
+      save.world = next.id;
+    }
+  }
   save.gold += r.gold + bonus;
   save.runs++;
   if (r.time > save.best.time) save.best.time = r.time;
@@ -149,7 +173,7 @@ function finishRun(r: RunResult) {
   sfx.music(null);
   if (r.won) sfx.victory();
   else sfx.defeat();
-  ui.result(r, bonus, () =>
+  ui.result(r, bonus, note, () =>
     slash(() => {
       mode = 'lobby';
       sfx.music('lobby');
@@ -182,7 +206,10 @@ function frame(now: number) {
     run.camY = panelSide === 'right' ? 2 : -4;
   }
   if (banner) banner.t -= dt;
-  if (mode === 'play' && !run.over) sfx.music(run.boss ? (run.boss.type === 'overlord' ? 'boss2' : 'boss1') : 'battle');
+  if (mode === 'play' && !run.over) {
+    const M = run.world.music;
+    sfx.music(run.boss ? (run.boss.type === run.world.boss2.type ? M.boss2 : M.boss1) : M.battle);
+  }
   sfx.update(dt);
 
   run.render(wctx);

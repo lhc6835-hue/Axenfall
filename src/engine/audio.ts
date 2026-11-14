@@ -17,7 +17,7 @@ const SFX = [
   'break_open', 'break_shut', 'shell_breech', 'hammer', 'flint',
 ] as const;
 export type SfxName = (typeof SFX)[number];
-export type Track = 'lobby' | 'battle' | 'boss1' | 'boss2';
+export type Track = 'lobby' | 'battle' | 'boss1' | 'boss2' | 'battle2' | 'boss3' | 'boss4';
 
 interface PlayOpts {
   vol?: number;

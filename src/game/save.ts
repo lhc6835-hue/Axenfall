@@ -17,6 +17,10 @@ export interface Save {
   shop: { sword: Slot[]; gun: Slot[]; skin: Slot[]; rerolls: number; restockAt: number; gen: number };
   best: { time: number; kills: number; level: number };
   runs: number;
+  /** highest world beaten (0 = none) */
+  cleared: number;
+  /** the world picked in the lobby */
+  world: number;
   sound: boolean;
   music: boolean;
   fullscreen: boolean;
@@ -38,6 +42,8 @@ function fresh(): Save {
     shop: { sword: [], gun: [], skin: [], rerolls: 0, restockAt: 0, gen: 0 },
     best: { time: 0, kills: 0, level: 0 },
     runs: 0,
+    cleared: 0,
+    world: 1,
     sound: true,
     music: true,
     fullscreen: true,

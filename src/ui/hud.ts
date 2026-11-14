@@ -116,8 +116,9 @@ export function drawHud(ctx: CanvasRenderingContext2D, run: Run, W: number, H: n
   if (run.boss && !run.boss.dead) {
     const b = run.boss;
     const w = Math.min(220, W - 120);
-    txt(ctx, b.type === 'warden' ? '감시자 큐브' : '붉은 군주', W / 2, H - 22, 6.5, b.type === 'warden' ? '#8adfff' : '#ff8aa0', 'center');
-    bar(ctx, W / 2 - w / 2, H - 15, w, 5, b.hp / b.max, b.type === 'warden' ? '#6aa8ff' : '#ff4a6a');
+    const info = b.type === run.world.boss1.type ? run.world.boss1 : run.world.boss2;
+    txt(ctx, info.name, W / 2, H - 22, 6.5, info.color, 'center');
+    bar(ctx, W / 2 - w / 2, H - 15, w, 5, b.hp / b.max, info.bar);
   }
 
   // parry stats
