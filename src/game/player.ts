@@ -146,6 +146,12 @@ export class Player {
     this.sword.update(dt, ax, ay, aim, time);
     if (this.sword.parryT > 0) run.parryShots(this.x, this.y, this.sword.reach() + 4, this.sword);
 
+    // the rear hand belongs to the blade while it is out: a long gun is then fired one-handed,
+    // and lowered with its fire held while that hand reaches back to draw or sheathe
+    const sw = this.sword;
+    const two = this.gun.hold.two && sw.stowed;
+    this.gun.oneHand = two && (sw.busy || sw.drawn);
+    this.gun.reaching = two && (sw.pull >= 0 || (sw.sheath >= 0 && sw.sheath < 1));
     this.gun.update(dt, ax, ay, spd > 10 ? Math.atan2(this.vy, this.vx) : NaN);
   }
 

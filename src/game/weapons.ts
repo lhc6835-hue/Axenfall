@@ -78,6 +78,13 @@ export class GunCtl {
   hy = 0;
   fy = 1;
   sideK = 1;
+  /** a long gun that has lost its rear hand to the blade (set by the owner every frame) */
+  oneHand = false;
+  /** the rear hand is reaching back to draw or sheathe: the gun is lowered and holds fire */
+  reaching = false;
+  /** smoothed: how one-handed the grip is, and how far the gun is lowered */
+  ohK = 0;
+  lowK = 0;
   drawAng = 0;
   private prevU = 0;
   /** true while firing (minigun slows the player) */
@@ -148,6 +155,11 @@ export class GunCtl {
     const turn = def.kind === 'minigun' ? 9 : def.kind === 'sniper' || def.kind === 'railgun' ? 14 : 26;
     this.aim += angDiff(this.aim, want) * Math.min(1, dt * turn);
 
+    // ---- one hand off the gun ----
+    this.ohK += ((this.oneHand ? 1 : 0) - this.ohK) * Math.min(1, dt * 10);
+    const lowTo = this.reaching ? 1 : this.oneHand ? (this.firing > 0 ? 0.1 : 0.3) : 0;
+    this.lowK += (lowTo - this.lowK) * Math.min(1, dt * 14);
+
     // ---- springs ----
     const ret = this.hold.ret;
     [this.kick, this.kickV] = spring(this.kick, this.kickV, 700 * ret * ret, 30 * ret, dt);
@@ -206,7 +218,8 @@ export class GunCtl {
       this.startReload();
     } else if (t && this.cycle < 0 && this.burstLeft <= 0 && this.delayT < 0) {
       this.flourish = -1;
-      const aligned = Math.abs(angDiff(this.aim, want)) < 0.35;
+      // no shot while the rear hand is off reaching for the blade
+      const aligned = Math.abs(angDiff(this.aim, want)) < 0.35 && !this.reaching;
       if (def.kind === 'railgun') {
         if (this.cd <= 0 && aligned) {
           if (this.charge === 0) sfx.charge();
@@ -217,7 +230,7 @@ export class GunCtl {
           }
         }
       } else if (def.kind === 'minigun') {
-        if (this.cd <= 0 && this.barrelV > 0.3) this.fire();
+        if (this.cd <= 0 && this.barrelV > 0.3 && !this.reaching) this.fire();
       } else if (this.cd <= 0 && aligned) this.fire();
     } else if (!t) {
       this.charge = Math.max(0, this.charge - dt * 3);
@@ -242,7 +255,8 @@ export class GunCtl {
   }
 
   rate() {
-    const r = this.def.rate * this.run.mods.fireRate;
+    // one hand on a long gun: slower, it has to be hauled back on target after every shot
+    const r = this.def.rate * this.run.mods.fireRate * (1 - 0.3 * this.ohK);
     return this.def.kind === 'minigun' ? r * (0.25 + 0.75 * this.barrelV) : r;
   }
 
@@ -313,13 +327,15 @@ export class GunCtl {
     run.fx.sparks(mx, my, this.aim, 0.5, def.kind === 'shotgun' ? 6 : 2, 160, 0xffb84a, 0xffffff, 0.12);
     // recoil: the gun snaps back and flips up at once, then springs home
     const h = this.hold;
-    this.kick = Math.min(h.kick * 1.6, this.kick + h.kick);
+    // held in one hand the same gun bucks a lot harder
+    const oh = 1 + 0.8 * this.ohK;
+    this.kick = Math.min(h.kick * 1.6 * oh, this.kick + h.kick * oh);
     this.kickV = 0;
-    this.climb = Math.min(h.climb * 1.5, this.climb + h.climb * rand(0.85, 1.15));
+    this.climb = Math.min(h.climb * 1.5 * oh, this.climb + h.climb * oh * rand(0.85, 1.15));
     this.climbV = 0;
-    if (h.yaw) this.yawV += rand(-1, 1) * h.yaw * 40;
+    this.yawV += rand(-1, 1) * ((h.yaw ?? 0) + 0.05 * this.ohK) * 40;
     // ...and the shooter and the camera take the shove too
-    run.player.recoil(this.aim, h.push, h.kick / 6);
+    run.player.recoil(this.aim, h.push * (1 + 0.3 * this.ohK), (h.kick / 6) * oh);
     run.camKick(this.aim, h.cam);
     if (h.stop) run.hitstop(h.stop);
     run.shake(def.shake * 0.5);
@@ -651,7 +667,9 @@ export class GunCtl {
     const kind = this.def.kind;
     const h = this.hold;
     let rot = -this.climb + this.yaw; // negative = muzzle up
-    let du = -this.kick, dv = 0;
+    // lowered toward the hip while the rear hand is away
+    rot += this.lowK * 0.4;
+    let du = -this.kick - this.lowK * 2.5, dv = this.lowK * 1.5;
     let spin = 0;
     let drumSpin = 0;
     let pivot: [number, number] = [1, 0];
