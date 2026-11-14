@@ -101,7 +101,7 @@ export class Player {
     this.walk += spd * dt * 0.12;
     const bounce = spd > 10 ? Math.abs(Math.sin(this.walk)) * 0.08 : 0;
     const dashS = this.dashT > 0 ? 0.25 : 0;
-    const crouch = this.sword.squash * 0.1 - this.sword.hop * 0.06;
+    const crouch = this.sword.squash * 0.1;
     this.sx = lerp(this.sx, 1 + bounce * 0.5 + dashS + crouch, Math.min(1, dt * 20));
     // the weapons have weight: they lag behind a change of pace and ride the step
     const lagX = clamp(-this.vx * 0.012, -2.5, 2.5), lagY = clamp(-this.vy * 0.012, -2.5, 2.5);
@@ -191,7 +191,8 @@ export class Player {
     if (gunBehind) this.gun.draw(g, hc, swordHand, time, 'gun');
     if (!blink) {
       const flashW = this.hurtFlash > 0.15 ? 1 : 0;
-      const hop = Math.sin(Math.min(1, this.sword.hop) * Math.PI) * 3;
+      // rising cuts no longer hop the body: the weight goes into the twist instead
+      const hop = 0;
       // the sprung squash: compress along kSqA, bulge across it
       const q = clamp(this.kSq, -0.4, 0.4);
       const ca = Math.abs(Math.cos(this.kSqA)), sa = Math.abs(Math.sin(this.kSqA));
@@ -226,7 +227,9 @@ export class Player {
   /** the cut leaves: the body snaps into it, all weight behind the blade */
   swingFeel(a: number, side: number, heavy: boolean, fin: boolean) {
     if (this.dead) return;
-    const k = (heavy ? 1.35 : 1) * (fin ? 1.25 : 1);
+    // a rising cut drives up through the whole body
+    const rising = this.sword.hop > 0.9;
+    const k = (heavy ? 1.35 : 1) * (fin ? 1.25 : 1) * (rising ? 1.35 : 1);
     this.afterimage();
     this.kRot = clamp(this.kRot + side * 0.2 * k, -0.45, 0.45);
     this.kRotV = 0;
