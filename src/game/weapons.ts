@@ -25,21 +25,21 @@ interface Hold {
   stop?: number;
 }
 const HOLD: Record<GunKind, Hold> = {
-  pistol: { d: 9, side: 2, two: false, fore: [0, 0], kick: 2.6, climb: 0.28, push: 30, cam: 1.6, ret: 1 },
-  revolver: { d: 9, side: 2, two: false, fore: [0, 0], kick: 3.4, climb: 0.5, push: 55, cam: 2.6, ret: 0.8 },
-  smg: { d: 8.5, side: 2.5, two: false, fore: [0, 0], kick: 1.3, climb: 0.07, push: 9, cam: 0.7, ret: 1.4, yaw: 0.06 },
-  shotgun: { d: 7, side: 2.5, two: true, fore: [8.5, -1.2], kick: 4.5, climb: 0.38, push: 130, cam: 4.5, ret: 0.75, stop: 0.02 },
-  sniper: { d: 6, side: 2.5, two: true, fore: [10, -1.5], kick: 5, climb: 0.3, push: 110, cam: 4.5, ret: 0.7, stop: 0.02 },
-  minigun: { d: 7, side: 3.5, two: true, fore: [-1.5, -9], kick: 1, climb: 0.035, push: 7, cam: 0.5, ret: 1.6, yaw: 0.05 },
-  railgun: { d: 7, side: 2.5, two: true, fore: [8, 0], kick: 6, climb: 0.35, push: 170, cam: 6.5, ret: 0.6, stop: 0.03 },
-  derringer: { d: 8, side: 2, two: false, fore: [0, 0], kick: 2, climb: 0.32, push: 25, cam: 1.5, ret: 1.1 },
-  lever: { d: 8, side: 2.5, two: false, fore: [0, 0], kick: 3.4, climb: 0.36, push: 55, cam: 2.6, ret: 0.9 },
-  rifle: { d: 6, side: 2.5, two: true, fore: [10, -1.5], kick: 1.7, climb: 0.1, push: 16, cam: 1.1, ret: 1.3, yaw: 0.04 },
-  laser: { d: 9, side: 2, two: false, fore: [0, 0], kick: 1, climb: 0.06, push: 6, cam: 0.6, ret: 1.4, yaw: 0.03 },
-  dbarrel: { d: 8, side: 2, two: false, fore: [0, 0], kick: 5, climb: 0.75, push: 150, cam: 5, ret: 0.65, stop: 0.025 },
-  cannon: { d: 9, side: 2, two: false, fore: [0, 0], kick: 5, climb: 0.95, push: 150, cam: 5.5, ret: 0.55, stop: 0.03 },
-  musket: { d: 5, side: 2.5, two: true, fore: [12, -1.5], kick: 6, climb: 0.38, push: 180, cam: 6.5, ret: 0.6, stop: 0.03 },
-  launcher: { d: 6, side: 3, two: true, fore: [10.8, 0.5], kick: 5, climb: 0.3, push: 140, cam: 5, ret: 0.65, stop: 0.02 },
+  pistol: { d: 7.5, side: 2, two: false, fore: [0, 0], kick: 2.6, climb: 0.28, push: 30, cam: 1.6, ret: 1 },
+  revolver: { d: 7.5, side: 2, two: false, fore: [0, 0], kick: 3.4, climb: 0.5, push: 55, cam: 2.6, ret: 0.8 },
+  smg: { d: 7.5, side: 2.5, two: false, fore: [0, 0], kick: 1.3, climb: 0.07, push: 9, cam: 0.7, ret: 1.4, yaw: 0.06 },
+  shotgun: { d: 7, side: 4, two: true, fore: [8.5, -1.2], kick: 4.5, climb: 0.38, push: 130, cam: 4.5, ret: 0.75, stop: 0.02 },
+  sniper: { d: 6, side: 4, two: true, fore: [10, -1.5], kick: 5, climb: 0.3, push: 110, cam: 4.5, ret: 0.7, stop: 0.02 },
+  minigun: { d: 7, side: 4.5, two: true, fore: [-1.5, -9], kick: 1, climb: 0.035, push: 7, cam: 0.5, ret: 1.6, yaw: 0.05 },
+  railgun: { d: 7, side: 4, two: true, fore: [8, 0], kick: 6, climb: 0.35, push: 170, cam: 6.5, ret: 0.6, stop: 0.03 },
+  derringer: { d: 7.5, side: 2, two: false, fore: [0, 0], kick: 2, climb: 0.32, push: 25, cam: 1.5, ret: 1.1 },
+  lever: { d: 7.5, side: 2.5, two: false, fore: [0, 0], kick: 3.4, climb: 0.36, push: 55, cam: 2.6, ret: 0.9 },
+  rifle: { d: 6, side: 4, two: true, fore: [10, -1.5], kick: 1.7, climb: 0.1, push: 16, cam: 1.1, ret: 1.3, yaw: 0.04 },
+  laser: { d: 7.5, side: 2, two: false, fore: [0, 0], kick: 1, climb: 0.06, push: 6, cam: 0.6, ret: 1.4, yaw: 0.03 },
+  dbarrel: { d: 7.5, side: 2, two: false, fore: [0, 0], kick: 5, climb: 0.75, push: 150, cam: 5, ret: 0.65, stop: 0.025 },
+  cannon: { d: 7.5, side: 2, two: false, fore: [0, 0], kick: 5, climb: 0.95, push: 150, cam: 5.5, ret: 0.55, stop: 0.03 },
+  musket: { d: 5, side: 4, two: true, fore: [12, -1.5], kick: 6, climb: 0.38, push: 180, cam: 6.5, ret: 0.6, stop: 0.03 },
+  launcher: { d: 6, side: 4.5, two: true, fore: [10.8, 0.5], kick: 5, climb: 0.3, push: 140, cam: 5, ret: 0.65, stop: 0.02 },
 };
 
 /** post-shot action length (pump, bolt) */
@@ -931,7 +931,8 @@ export class GunCtl {
     return { rot, du, dv, spin, pivot, grip };
   }
 
-  draw(g: Gfx, handC: number, swordUsingOffhand: boolean, time: number) {
+  /** part: 'all', or the gun alone / the hands alone so the body can sit between them */
+  draw(g: Gfx, handC: number, swordUsingOffhand: boolean, time: number, part: 'all' | 'gun' | 'hands' = 'all') {
     const { rot, du, dv, spin, pivot, grip } = this.computePose(handC, swordUsingOffhand);
     const fy = this.fy;
     const base = this.aim + rot * fy;
@@ -943,8 +944,16 @@ export class GunCtl {
     const [wx, wy] = bx.pt(ou, ov);
     const X = new Xf(g, wx, wy, base + spin * fy, fy);
     this.drawAng = base + spin * fy;
-    drawGun(X, this.def.kind, this.pose, time);
-    hand(X, grip[0], grip[1], handC);
+    const h2 = this.pose.hand2;
+    if (part !== 'hands') {
+      if (part === 'gun') this.pose.hand2 = null;
+      drawGun(X, this.def.kind, this.pose, time);
+      this.pose.hand2 = h2;
+    }
+    if (part !== 'gun') {
+      if (part === 'hands' && h2) hand(X, h2[0], h2[1], handC);
+      hand(X, grip[0], grip[1], handC);
+    }
   }
 }
 

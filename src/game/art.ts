@@ -77,9 +77,12 @@ export const PORT: Record<GunKind, [number, number]> = {
   derringer: [1, -4], lever: [1, -5], rifle: [3, -5], laser: [2, -5], dbarrel: [2, -3], cannon: [4, -5.5], musket: [-1, -5], launcher: [2, -5],
 };
 
+/** a little cube fist: dark rim so it reads on any body or floor, lit top, shaded bottom */
 export function hand(x: Xf, u: number, v: number, c: number) {
-  x.q(u - 1.5, v - 1.5, 3, 3, mix(c, 0x000000, 0.35));
-  x.q(u - 1.5, v - 1.5, 2, 2, c);
+  x.q(u - 2.5, v - 2.5, 5, 5, 0x0c0a14);
+  x.q(u - 2, v - 2, 4, 4, c);
+  x.q(u - 2, v - 2, 4, 1, mix(c, 0xffffff, 0.35));
+  x.q(u - 2, v + 1, 4, 1, mix(c, 0x000000, 0.3));
 }
 
 export function drawGun(x: Xf, kind: GunKind, p: GunPose, time: number) {
@@ -743,6 +746,6 @@ export function drawCube(g: Gfx, skin: SkinDef, cx: number, cy: number, s: numbe
 }
 
 /** hand colour that matches a skin */
-export const handColor = (skin: SkinDef) => (skin.kind === 'neon' || skin.kind === 'galaxy' || skin.kind === 'lava' ? skin.a : mix(skin.a, skin.b, 0.5));
+export const handColor = (skin: SkinDef) => (skin.kind === 'neon' || skin.kind === 'galaxy' || skin.kind === 'lava' ? skin.a : mix(mix(skin.a, skin.b, 0.6), 0x000000, 0.12));
 
 export { K as PAL, TAU };

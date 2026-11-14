@@ -39,6 +39,9 @@ export class Player {
   kSq = 0;
   kSqV = 0;
   kSqA = 0;
+  /** where the hands carry the weapons, relative to the body: they trail motion and bob with the step */
+  carryX = 0;
+  carryY = 0;
 
   constructor(private run: Run, gun: GunDef, gunLvl: number, sword: SwordDef, swordLvl: number, skin: SkinDef) {
     this.gun = new GunCtl(gun, gunLvl, run);
@@ -100,6 +103,11 @@ export class Player {
     const dashS = this.dashT > 0 ? 0.25 : 0;
     const crouch = this.sword.squash * 0.1 - this.sword.hop * 0.06;
     this.sx = lerp(this.sx, 1 + bounce * 0.5 + dashS + crouch, Math.min(1, dt * 20));
+    // the weapons have weight: they lag behind a change of pace and ride the step
+    const lagX = clamp(-this.vx * 0.012, -2.5, 2.5), lagY = clamp(-this.vy * 0.012, -2.5, 2.5);
+    const bob = spd > 10 ? bounce * 14 : Math.sin(time * 2.4) * 0.4;
+    this.carryX += (lagX - this.carryX) * Math.min(1, dt * 9);
+    this.carryY += (lagY + bob - this.carryY) * Math.min(1, dt * 14);
     this.sy = lerp(this.sy, 1 - bounce - dashS * 0.6 - crouch, Math.min(1, dt * 20));
 
     // critically damped: the body snaps over and settles back without wobbling
@@ -129,12 +137,13 @@ export class Player {
     }
     if (input && input.take('reload')) this.gun.startReload();
 
-    this.sword.hx0 = this.x;
-    this.sword.hy0 = this.y;
-    this.sword.update(dt, this.x, this.y, aim, time);
+    const ax = this.x + this.carryX, ay = this.y + this.carryY;
+    this.sword.hx0 = ax;
+    this.sword.hy0 = ay;
+    this.sword.update(dt, ax, ay, aim, time);
     if (this.sword.parryT > 0) run.parryShots(this.x, this.y, this.sword.reach() + 4, this.sword);
 
-    this.gun.update(dt, this.x, this.y, spd > 10 ? Math.atan2(this.vy, this.vx) : NaN);
+    this.gun.update(dt, ax, ay, spd > 10 ? Math.atan2(this.vy, this.vx) : NaN);
   }
 
   /** in the lobby the cube attacks by itself */
@@ -160,7 +169,8 @@ export class Player {
     g.ellipse(this.x, this.y + 7, 6.5, 2.2, 0x000000, 0.35, true);
 
     const blink = this.inv > 0 && !this.dead && Math.sin(time * 50) > 0 && this.hurtFlash > 0;
-    const gunBehind = Math.sin(this.gun.aim) < -0.35;
+    // long guns ride along the body's side: the stock tucks behind it, the hands stay in front
+    const gunBehind = Math.sin(this.gun.aim) < -0.35 || (this.gun.hold.two && Math.sin(this.gun.aim) < 0.55);
     const swordBehind = Math.sin(this.sword.ang) < -0.2 && this.sword.state === 'rest';
     // stowed blades (saya, back, belt, shoulder) rest without a hand when the gun needs both
     const sk = this.sword.def.kind;
@@ -169,7 +179,7 @@ export class Player {
     const offhandBusy = this.sword.busy;
 
     if (swordBehind) this.sword.draw(g, hc, time, swordHand);
-    if (gunBehind) this.gun.draw(g, hc, offhandBusy, time);
+    if (gunBehind) this.gun.draw(g, hc, offhandBusy, time, 'gun');
     if (!blink) {
       const flashW = this.hurtFlash > 0.15 ? 1 : 0;
       const hop = Math.sin(Math.min(1, this.sword.hop) * Math.PI) * 3;
@@ -180,7 +190,7 @@ export class Player {
       const sy = clamp(this.sy * (1 - q * sa + q * 0.6 * ca), 0.55, 1.5);
       drawCube(g, skin, this.x, this.y - 1 - hop, this.size, this.tilt + this.sword.bodyRot + this.kRot, time, sx, sy, flashW);
     }
-    if (!gunBehind) this.gun.draw(g, hc, offhandBusy, time);
+    this.gun.draw(g, hc, offhandBusy, time, gunBehind ? 'hands' : 'all');
     if (!swordBehind) this.sword.draw(g, hc, time, swordHand);
   }
 
