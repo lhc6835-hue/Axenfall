@@ -1,5 +1,5 @@
 import { Gfx } from '../engine/gfx';
-import { TAU, angDiff, clamp, hsv, lerp, rand } from '../engine/math';
+import { TAU, angDiff, clamp, hsv, lerp, rand, spring } from '../engine/math';
 import { sfx } from '../engine/audio';
 import type { Input } from '../engine/input';
 import { drawCube, handColor } from './art';
@@ -33,6 +33,12 @@ export class Player {
   hurtFlash = 0;
   dead = false;
   size = 11;
+  /** sprung body reactions to blade work: a twist and a squash along kSqA */
+  kRot = 0;
+  kRotV = 0;
+  kSq = 0;
+  kSqV = 0;
+  kSqA = 0;
 
   constructor(private run: Run, gun: GunDef, gunLvl: number, sword: SwordDef, swordLvl: number, skin: SkinDef) {
     this.gun = new GunCtl(gun, gunLvl, run);
@@ -96,6 +102,8 @@ export class Player {
     this.sx = lerp(this.sx, 1 + bounce * 0.5 + dashS + crouch, Math.min(1, dt * 20));
     this.sy = lerp(this.sy, 1 - bounce - dashS * 0.6 - crouch, Math.min(1, dt * 20));
 
+    [this.kRot, this.kRotV] = spring(this.kRot, this.kRotV, 170, 13, dt);
+    [this.kSq, this.kSqV] = spring(this.kSq, this.kSqV, 260, 15, dt);
     this.inv -= dt;
     this.hurtFlash = Math.max(0, this.hurtFlash - dt);
     for (const gh of this.ghosts) gh.life -= dt;
@@ -164,7 +172,12 @@ export class Player {
     if (!blink) {
       const flashW = this.hurtFlash > 0.15 ? 1 : 0;
       const hop = Math.sin(Math.min(1, this.sword.hop) * Math.PI) * 3;
-      drawCube(g, skin, this.x, this.y - 1 - hop, this.size, this.tilt + this.sword.bodyRot, time, this.sx, this.sy, flashW);
+      // the sprung squash: compress along kSqA, bulge across it
+      const q = clamp(this.kSq, -0.4, 0.4);
+      const ca = Math.abs(Math.cos(this.kSqA)), sa = Math.abs(Math.sin(this.kSqA));
+      const sx = clamp(this.sx * (1 - q * ca + q * 0.6 * sa), 0.55, 1.5);
+      const sy = clamp(this.sy * (1 - q * sa + q * 0.6 * ca), 0.55, 1.5);
+      drawCube(g, skin, this.x, this.y - 1 - hop, this.size, this.tilt + this.sword.bodyRot + this.kRot, time, sx, sy, flashW);
     }
     if (!gunBehind) this.gun.draw(g, hc, offhandBusy, time);
     if (!swordBehind) this.sword.draw(g, hc, time, swordHand);
@@ -184,19 +197,19 @@ export class Player {
     this.tilt -= 0.28 * k * (ca >= 0 ? 1 : -1);
   }
 
-  /** squash (amt > 0) or stretch (amt < 0) the cube along direction a, bulging the other way */
+  /** kick the sprung squash: amt > 0 squashes along a, amt < 0 stretches into it */
   private squashAlong(a: number, amt: number) {
-    const ca = Math.abs(Math.cos(a)), sa = Math.abs(Math.sin(a));
-    this.sx = clamp(this.sx - amt * ca + amt * 0.5 * sa, 0.6, 1.45);
-    this.sy = clamp(this.sy - amt * sa + amt * 0.5 * ca, 0.6, 1.45);
+    this.kSqA = a;
+    this.kSq = 0;
+    this.kSqV = amt * 24;
   }
 
   /** the cut leaves: the body twists with the blade and stretches into it */
   swingFeel(a: number, side: number, heavy: boolean, fin: boolean) {
     if (this.dead) return;
     const k = (heavy ? 1.4 : 1) * (fin ? 1.3 : 1);
-    this.tilt += side * 0.2 * k;
-    this.squashAlong(a, -0.16 * k);
+    this.kRotV += side * 8 * k;
+    this.squashAlong(a, -0.22 * k);
     this.run.camKick(a + Math.PI, 0.9 * k);
   }
 
@@ -222,7 +235,7 @@ export class Player {
       this.vy -= Math.sin(threat) * push;
     }
     this.squashAlong(threat, (perfect ? 0.24 : 0.3) * Math.min(1.3, force));
-    this.tilt -= (Math.cos(threat) >= 0 ? 1 : -1) * (perfect ? 0.22 : 0.32) * Math.min(1.3, force);
+    this.kRotV -= (Math.cos(threat) >= 0 ? 1 : -1) * (perfect ? 6 : 8.5) * Math.min(1.3, force);
     this.run.camKick(threat, (perfect ? 2.5 : 3.5) * force);
   }
 
