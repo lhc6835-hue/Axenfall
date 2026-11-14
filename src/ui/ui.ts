@@ -3,7 +3,7 @@ import { sfx } from '../engine/audio';
 import { BLADE_LEN, MUZZLE, blankPose, drawCube, drawGun, drawSword } from '../game/art';
 import {
   ENHANCE_BONUS, ENHANCE_MAX, GUNS, RARITY, RARITY_ORDER, SKINS, SWORDS, UPGRADES,
-  gunById, skinById, swordById, type GunDef, type SkinDef, type SwordDef, type Upgrade,
+  gunById, gunLook, skinById, swordById, swordLook, type GunDef, type SkinDef, type SwordDef, type Upgrade,
 } from '../game/data';
 import { buy, catalog, checkTimedRestock, persist, priceOf, purchasable, rerollCost, reroll, resetSave, save, type ShopCat, type Slot } from '../game/save';
 import type { RunResult } from '../game/run';
@@ -59,19 +59,26 @@ function paintPreview(ctx: CanvasRenderingContext2D, item: Item, time: number) {
   for (let x = 0; x < PV_W; x += 4) g.rect(x, PV_H - 3, 2, 1, 0x1f1a2e);
   if (item.cat === 'gun') {
     const def = gunById(item.id);
-    const L = MUZZLE[def.kind][0];
+    const look = gunLook(def);
+    const L = MUZZLE[look][0];
     const x = new Xf(g, PV_W / 2 - L / 2 + 3, PV_H / 2 + 3, 0, 1);
-    drawGun(x, def.kind, blankPose(), time);
+    drawGun(x, look, blankPose(), time);
   } else if (item.cat === 'sword') {
     const def = swordById(item.id);
-    const L = BLADE_LEN[def.kind];
+    const k = swordLook(def);
+    const L = BLADE_LEN[k];
     // long polearms sit diagonally so the whole weapon fits the card
-    const k = def.kind;
-    const diag = k === 'spear' || k === 'twinblade' || k === 'nodachi';
-    const ang = k === 'scythe' ? 0.35 : diag ? -0.4 : -0.25;
-    const cx = k === 'spear' ? PV_W / 2 - 5 : k === 'twinblade' ? PV_W / 2 : k === 'nodachi' ? PV_W / 2 - 9 : PV_W / 2 - L / 2 + 1;
+    const diag = k === 'spear' || k === 'twinblade' || k === 'nodachi' || k === 'halberd' || k === 'flamberge' || k === 'hammer';
+    const ang = k === 'scythe' || k === 'glaive' ? 0.35 : diag ? -0.4 : -0.25;
+    const cx =
+      k === 'spear' || k === 'halberd' ? PV_W / 2 - 5
+      : k === 'twinblade' ? PV_W / 2
+      : k === 'nodachi' || k === 'flamberge' ? PV_W / 2 - 9
+      : k === 'hammer' ? PV_W / 2 - 7
+      : k === 'glaive' ? PV_W / 2 - 3
+      : PV_W / 2 - L / 2 + 1;
     const x = new Xf(g, cx, PV_H / 2 + (diag ? 1 : 0), ang, 1);
-    drawSword(x, def.kind, def.color, time, false);
+    drawSword(x, k, def.color, time, false);
   } else {
     const def = skinById(item.id);
     drawCube(g, def, PV_W / 2, PV_H / 2, 12, Math.sin(time * 1.5) * 0.12, time);
@@ -119,6 +126,8 @@ function gunStats(d: GunDef, lvl = 0) {
     ['탄창', `${d.mag}`],
     ['사거리', `${d.range}`],
     d.pierce > 0 ? ['관통', d.pierce > 100 ? '무한' : `${d.pierce}`] : ['치명', `${Math.round(d.crit * 100)}%`],
+    ...(d.splash ? [['폭발', `${d.splash}`]] : []),
+    ...(d.bounce ? [['연쇄', `${d.bounce}회`]] : []),
   ];
 }
 function swordStats(d: SwordDef, lvl = 0) {
@@ -127,6 +136,7 @@ function swordStats(d: SwordDef, lvl = 0) {
     ['사거리', `${d.reach}`],
     ['쿨타임', `${d.cooldown}초`],
     ['패리', `${d.parry.toFixed(2)}초`],
+    ...(d.wave ? [['검기', `${Math.round(d.wave * 100)}%`]] : []),
   ];
 }
 const statHtml = (rows: string[][]) => `<div class="stats">${rows.map(([k, v]) => `<span><i>${k}</i>${v}</span>`).join('')}</div>`;

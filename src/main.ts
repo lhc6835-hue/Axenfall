@@ -3,7 +3,7 @@ import { Input, isTyping } from './engine/input';
 import { cloud, initCloud } from './net/cloud';
 import { sfx } from './engine/audio';
 import { clamp } from './engine/math';
-import { SWORDS, gunById, skinById, swordById, type GunDef, type SkinDef, type SwordDef } from './game/data';
+import { GUNS, SWORDS, gunById, skinById, swordById, type GunDef, type SkinDef, type SwordDef } from './game/data';
 import { persist, restock, save } from './game/save';
 import { Run, type Loadout, type RunResult } from './game/run';
 import { drawHud, type Banner } from './ui/hud';
@@ -227,6 +227,7 @@ function frame(now: number) {
   if (import.meta.env.DEV) {
     (window as any).__run = run;
     (window as any).__swords = SWORDS;
+    (window as any).__guns = GUNS;
   }
   requestAnimationFrame(frame);
 }

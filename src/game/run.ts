@@ -525,6 +525,17 @@ export class Run {
     });
   }
 
+  /** a flying crescent thrown off a cut */
+  bladeWave(px: number, py: number, a: number, dmg: number, c: number) {
+    const x = px + Math.cos(a) * 10, y = py + Math.sin(a) * 10;
+    const sp = 270;
+    this.shots.push({
+      x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, r: 5, dmg, life: 0.55, friendly: true, c, pierce: 3,
+      hit: new Set(), px: x, py: y, kind: 'crescent',
+    });
+    this.fx.flare(x, y, 6, c, 0.06);
+  }
+
   sawShot(e: Enemy, a: number) {
     if (this.hostileShots() >= this.shotCap()) return;
     const sp = 200;
@@ -1155,7 +1166,7 @@ export class Run {
       }
       if (s.kind === 'crescent') {
         const a = Math.atan2(s.vy, s.vx);
-        g.arc(s.x - Math.cos(a) * 4, s.y - Math.sin(a) * 4, 7, 2.5, a - 1.2, a + 1.2, s.friendly ? 0xffe46a : s.c);
+        g.arc(s.x - Math.cos(a) * 4, s.y - Math.sin(a) * 4, 7, 2.5, a - 1.2, a + 1.2, s.c);
         g.arc(s.x - Math.cos(a) * 3, s.y - Math.sin(a) * 3, 7, 1, a - 0.9, a + 0.9, 0xffffff);
         g.glow(s.x, s.y, 16, s.c, 0.5);
         continue;

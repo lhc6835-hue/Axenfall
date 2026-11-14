@@ -1,7 +1,7 @@
 import { Gfx, Xf } from '../engine/gfx';
 import { TAU, angDiff, clamp, ease, lerp, rand, rayCircle, seg, segDist, spring, mix } from '../engine/math';
 import { sfx } from '../engine/audio';
-import { ENHANCE_BONUS, type GunDef, type GunKind, type SwordDef, type SwordKind } from './data';
+import { ENHANCE_BONUS, gunLook, swordLook, type GunDef, type GunKind, type GunLook, type SwordDef, type SwordKind, type SwordLook } from './data';
 import { BLADE_LEN, MUZZLE, PORT, blankPose, drawGun, drawSword, hand, type GunPose } from './art';
 import { PK } from './fx';
 import type { Run } from './run';
@@ -261,7 +261,7 @@ export class GunCtl {
   }
 
   muzzle(): [number, number] {
-    const [mu, mv] = MUZZLE[this.def.kind];
+    const [mu, mv] = MUZZLE[gunLook(this.def)];
     const x = new Xf(null as unknown as Gfx, this.hx, this.hy, this.aim, this.fy);
     return x.pt(mu - this.kick, mv);
   }
@@ -305,7 +305,7 @@ export class GunCtl {
         a += (i / (pellets - 1) - 0.5) * def.spread + rand(-0.04, 0.04);
       } else a += rand(-def.spread / 2, def.spread / 2) * (this.def.kind === 'minigun' ? 1 - this.barrelV * 0.3 : 1);
       const crit = this.critShots > 0 || Math.random() < def.crit + run.mods.crit;
-      if (this.ray(mx, my, a, def.range, pierce, crit, run.mods.ricochet, def.tracer)) anyKill = true;
+      if (this.ray(mx, my, a, def.range, pierce, crit, run.mods.ricochet + (def.bounce ?? 0), def.tracer)) anyKill = true;
     }
     if (this.critShots > 0) this.critShots--;
     // muzzle
@@ -351,7 +351,9 @@ export class GunCtl {
   }
 
   private ejectCasing(c = 0xe8b64a, w = 2, h = 1) {
-    const [pu, pv] = PORT[this.def.kind];
+    // bows, harpoons, coils, nail strips and star cannons leave no brass behind
+    if (NO_BRASS[gunLook(this.def)]) return;
+    const [pu, pv] = PORT[gunLook(this.def)];
     const x = new Xf(null as unknown as Gfx, this.hx, this.hy, this.aim, this.fy);
     const [ex, ey] = x.pt(pu, pv);
     this.run.fx.casing(ex, ey, this.aim + (Math.PI / 2 + 0.6) * -this.fy, c, w, h);
@@ -967,7 +969,7 @@ export class GunCtl {
     const h2 = this.pose.hand2;
     if (part !== 'hands') {
       if (part === 'gun') this.pose.hand2 = null;
-      drawGun(X, this.def.kind, this.pose, time);
+      drawGun(X, gunLook(this.def), this.pose, time);
       this.pose.hand2 = h2;
     }
     if (part !== 'gun') {
@@ -1103,7 +1105,8 @@ const LEAN: Record<SwordKind, number> = {
   saber: 0.35, cleaver: 0.2, katar: 0.8, spear: 0.3, nodachi: 0.12, twinblade: 0, whip: 0.35, plasma: 0.15,
 };
 /** where the hand sits on the weapon (local x) */
-const GRIP: Record<SwordKind, number> = {
+const GRIP: Record<SwordLook, number> = {
+  tanto: -2.5, gladius: -2.5, axe: -3.5, halberd: 0, hammer: -3, flamberge: -3, chainsword: -2.5, glaive: -2, voidblade: -3, starblade: -2,
   dagger: -2.5, longsword: -2.5, rapier: -2.5, katana: -3, greatsword: -3, scythe: -2,
   saber: -2.5, cleaver: -2.5, katar: -1, spear: 0, nodachi: -4, twinblade: 0, whip: -2.5, plasma: -2,
 };
@@ -1135,6 +1138,9 @@ export const STOW: Record<SwordKind, { ang: number; hand: number; dist: number; 
 const SHEATHED: Partial<Record<SwordKind, true>> = { dagger: true, rapier: true, saber: true, longsword: true, katar: true };
 const PULL_T = 0.14;
 const SHEATH_T = 0.34;
+
+/** looks that eject nothing when cycled or reloaded */
+const NO_BRASS: Partial<Record<GunLook, true>> = { crossbow: true, harpoon: true, tesla: true, nailgun: true, nova: true, flare: true };
 
 const HEAVY: Partial<Record<SwordKind, true>> = { greatsword: true, scythe: true, cleaver: true, nodachi: true };
 const WHIP_N = 10;
@@ -1427,7 +1433,7 @@ export class SwordCtl {
   /** the stow pose with the grip slid back out along the blade by k of its length (the sheath mouth) */
   private pulledPose(time: number, k: number) {
     const st = this.stowPose(time);
-    const L = BLADE_LEN[this.def.kind] * 0.85 * k;
+    const L = BLADE_LEN[swordLook(this.def)] * 0.85 * k;
     const gx = Math.cos(st.hand) * st.dist - Math.cos(st.ang) * L;
     const gy = Math.sin(st.hand) * st.dist - Math.sin(st.ang) * L;
     return { ang: st.ang, hand: Math.atan2(gy, gx), dist: Math.hypot(gx, gy) };
@@ -1580,6 +1586,7 @@ export class SwordCtl {
           if (mv.hop === 1) this.hop = 1;
           if (mo === 'whip') this.resetChain();
           if (this.run.player) this.run.player.swingFeel(this.aim, this.side, !!HEAVY[k], !!mv.fin);
+          if (def.wave) this.run.bladeWave(px, py, this.aim, this.dmg() * def.wave * (mv.dmg ?? 1), def.color);
         }
         break;
       }
@@ -1747,7 +1754,7 @@ export class SwordCtl {
     this.clk += dt;
     const live = this.state === 'windup' || this.state === 'swing' || this.state === 'hold' || this.state === 'deflect' || (this.state === 'recover' && this.t < 0.06);
     if (live && this.pull < 0) {
-      const L = BLADE_LEN[k] * (this.move.m === 'whip' ? 1.6 : 0.55);
+      const L = BLADE_LEN[swordLook(this.def)] * (this.move.m === 'whip' ? 1.6 : 0.55);
       const mx = Math.cos(absHand) * dist + Math.cos(absAng) * L, my = Math.sin(absHand) * dist + Math.sin(absAng) * L;
       this.hist.push({ t: this.clk, a: Math.atan2(my, mx) });
       if (this.hist.length > 120) this.hist.shift();
@@ -1772,7 +1779,7 @@ export class SwordCtl {
         const tip = this.chain[WHIP_N - 1], mid = this.chain[WHIP_N - 4];
         this.trail.push({ tx: tip.x, ty: tip.y, mx: mid.x, my: mid.y, age: 0 });
       } else {
-        const L = BLADE_LEN[k] * (k === 'scythe' ? 1.1 : 1);
+        const L = BLADE_LEN[swordLook(this.def)] * (k === 'scythe' ? 1.1 : 1);
         const tip = k === 'scythe' ? L + 2 : L;
         this.trail.push({ tx: this.hx + ca * tip, ty: this.hy + sa * tip, mx: this.hx + ca * L * 0.6, my: this.hy + sa * L * 0.6, age: 0 });
         if (k === 'twinblade') this.trail2.push({ tx: this.hx - ca * tip, ty: this.hy - sa * tip, mx: this.hx - ca * L * 0.6, my: this.hy - sa * L * 0.6, age: 0 });
@@ -1947,8 +1954,8 @@ export class SwordCtl {
       const sx = this.hx0 + Math.cos(rest.hand) * rest.dist, sy = this.hy0 + Math.sin(rest.hand) * rest.dist;
       const Sx = new Xf(g, sx, sy, rest.ang, this.faceK >= 0 ? 1 : -1);
       if (this.state === 'rest') {
-        drawSword(Sx, k, def.color, time, true);
-        if (showHand) hand(Sx, GRIP[k], 0, handC);
+        drawSword(Sx, swordLook(def), def.color, time, true);
+        if (showHand) hand(Sx, GRIP[swordLook(this.def)], 0, handC);
         return;
       }
       Sx.q(1, -1.6, saya, 3.2, 0x3a1020);
@@ -1957,12 +1964,12 @@ export class SwordCtl {
     }
     const X = new Xf(g, this.hx, this.hy, this.ang, fy);
     const extended = this.move.m === 'whip' && this.ext > 0.05 && this.chain.length === WHIP_N && this.state !== 'deflect';
-    drawSword(X, k, def.color, time, false, extended ? 0 : this.ext, extended);
+    drawSword(X, swordLook(def), def.color, time, false, extended ? 0 : this.ext, extended);
     if (extended) this.drawChain(g);
-    if (showHand) hand(X, GRIP[k], 0, handC);
+    if (showHand) hand(X, GRIP[swordLook(this.def)], 0, handC);
     // a cold glint along the edge while guarding or in the perfect window
     if (this.state === 'swing' || (this.state === 'deflect' && this.t < 0.14)) {
-      const L = BLADE_LEN[k];
+      const L = BLADE_LEN[swordLook(this.def)];
       const [tx, ty] = X.pt(L * 0.7, 0);
       g.glow(tx, ty, 10, 0xffffff, this.state === 'deflect' ? 0.4 : 0.25);
     }
@@ -1977,7 +1984,7 @@ export class SwordCtl {
     const gx = this.hx0 + Math.cos(st.hand) * st.dist, gy = this.hy0 + Math.sin(st.hand) * st.dist;
     const X = new Xf(g, gx, gy, st.ang, fy);
     if (SHEATHED[k]) {
-      const L = BLADE_LEN[k];
+      const L = BLADE_LEN[swordLook(this.def)];
       const w = k === 'longsword' || k === 'saber' ? 3.6 : 3.2;
       X.q(1, -w / 2 - 0.5, L - 0.5, w + 1, 0x0c0a14);
       X.q(1.5, -w / 2, L - 1.5, w, 0x3a2418);

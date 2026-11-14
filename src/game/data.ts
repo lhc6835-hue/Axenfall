@@ -1,22 +1,31 @@
-export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic' | 'transcendent';
 
 export const RARITY: Record<Rarity, { name: string; color: string; weight: number; stock: [number, number] }> = {
-  common: { name: '일반', color: '#c9cbd6', weight: 52, stock: [2, 3] },
+  common: { name: '일반', color: '#c9cbd6', weight: 51, stock: [2, 3] },
   uncommon: { name: '고급', color: '#5fdc84', weight: 27, stock: [1, 2] },
   rare: { name: '희귀', color: '#4aa8ff', weight: 13, stock: [1, 2] },
   epic: { name: '영웅', color: '#b672ff', weight: 6, stock: [1, 1] },
   legendary: { name: '전설', color: '#ffb32e', weight: 2, stock: [1, 1] },
+  mythic: { name: '신화', color: '#ff4a5e', weight: 0.75, stock: [1, 1] },
+  transcendent: { name: '초월', color: '#7af6ff', weight: 0.25, stock: [1, 1] },
 };
-export const RARITY_ORDER: Rarity[] = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
+export const RARITY_ORDER: Rarity[] = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'transcendent'];
 
 // ---------------- guns ----------------
 export type GunKind =
   | 'pistol' | 'revolver' | 'smg' | 'shotgun' | 'sniper' | 'minigun' | 'railgun'
   | 'derringer' | 'lever' | 'rifle' | 'laser' | 'dbarrel' | 'cannon' | 'musket' | 'launcher';
+/** how a gun looks: its own art, while `kind` picks the handling, reload and sound it shares */
+export type GunLook =
+  | GunKind
+  | 'mpistol' | 'flare' | 'nailgun' | 'crossbow' | 'harpoon' | 'blunder' | 'tesla' | 'drum' | 'dragon' | 'nova' | 'void';
 
 export interface GunDef {
   id: string;
   kind: GunKind;
+  look?: GunLook;
+  /** hits arc on to nearby enemies (chain lightning, rebounding rounds) */
+  bounce?: number;
   name: string;
   rarity: Rarity;
   price: number;
@@ -122,16 +131,79 @@ export const GUNS: GunDef[] = [
     desc: '착탄 지점에서 폭발한다. 사격마다 드럼 탄창이 한 칸씩 회전한다.', hold: '두 손 · 허리 견착',
     dmg: 70, rate: 1.15, mag: 6, reload: 0.34, range: 210, spread: 0.02, pellets: 1, pierce: 0, crit: 0.05, knock: 120, stop: 0.07, shake: 6, tracer: 0xffa040, splash: 38,
   },
+  // ---- second armoury ----
+  {
+    id: 'g_mpistol', kind: 'pistol', look: 'mpistol', name: '기관권총 M9', rarity: 'uncommon', price: 1100,
+    desc: '연사로 개조한 권총. 긴 탄창을 꽂고 가볍게 흩뿌린다.', hold: '한 손 · 연사',
+    dmg: 5, rate: 9, mag: 24, reload: 1.15, range: 150, spread: 0.12, pellets: 1, pierce: 0, crit: 0.06, knock: 20, stop: 0.008, shake: 0.7, tracer: 0xfff0c0,
+  },
+  {
+    id: 'g_flare', kind: 'derringer', look: 'flare', name: '신호탄총', rarity: 'uncommon', price: 1500,
+    desc: '굵은 신호탄 한 발. 맞은 자리가 불꽃과 함께 터진다. 총신을 꺾어 장전한다.', hold: '한 손 · 중절식',
+    dmg: 32, rate: 1.3, mag: 1, reload: 0.75, range: 170, spread: 0.03, pellets: 1, pierce: 0, crit: 0.1, knock: 90, stop: 0.03, shake: 2.4, tracer: 0xff6a3a, splash: 24,
+  },
+  {
+    id: 'g_nail', kind: 'smg', look: 'nailgun', name: '공업용 네일건', rarity: 'rare', price: 2900,
+    desc: '쇠못을 연발로 박아 넣는다. 못은 적 두 마리를 꿰뚫는다.', hold: '한 손 · 못 띠 교체',
+    dmg: 9, rate: 7, mag: 40, reload: 1.6, range: 160, spread: 0.08, pellets: 1, pierce: 2, crit: 0.08, knock: 40, stop: 0.012, shake: 1, tracer: 0xd8dce8,
+  },
+  {
+    id: 'g_crossbow', kind: 'sniper', look: 'crossbow', name: '연발 석궁', rarity: 'rare', price: 3500,
+    desc: '사격마다 시위를 당겨 건다. 화살은 적 세 마리를 관통한다.', hold: '두 손 · 시위 장전',
+    dmg: 44, rate: 1.15, mag: 4, reload: 1.7, range: 260, spread: 0, pellets: 1, pierce: 3, crit: 0.25, knock: 120, stop: 0.04, shake: 2.6, tracer: 0xe8d8b0,
+  },
+  {
+    id: 'g_harpoon', kind: 'musket', look: 'harpoon', name: '포경 작살총', rarity: 'epic', price: 7600,
+    desc: '거대한 작살을 쏜다. 맞은 적은 멀리 날아간다. 작살을 총구에 밀어 넣어 장전한다.', hold: '두 손 · 작살 장전',
+    dmg: 125, rate: 0.7, mag: 1, reload: 1.9, range: 260, spread: 0, pellets: 1, pierce: 2, crit: 0.2, knock: 520, stop: 0.08, shake: 6, tracer: 0xd8c8a0,
+  },
+  {
+    id: 'g_blunder', kind: 'musket', look: 'blunder', name: '나팔총', rarity: 'epic', price: 6800,
+    desc: '나팔처럼 벌어진 총구로 쇳조각을 한 움큼 뿌린다. 가까울수록 무섭다.', hold: '두 손 · 꽂을대 장전',
+    dmg: 10, rate: 0.85, mag: 1, reload: 1.7, range: 105, spread: 0.85, pellets: 11, pierce: 0, crit: 0.05, knock: 220, stop: 0.06, shake: 6, tracer: 0xffc070,
+  },
+  {
+    id: 'g_tesla', kind: 'laser', look: 'tesla', name: '테슬라 코일건', rarity: 'legendary', price: 18500,
+    desc: '번개를 쏜다. 맞은 적에게서 근처의 적 셋에게 연쇄로 튄다. 과열되면 코일을 식힌다.', hold: '한 손 · 연쇄 번개',
+    dmg: 11, rate: 5, mag: 22, reload: 1.4, range: 180, spread: 0.03, pellets: 1, pierce: 0, crit: 0.08, knock: 30, stop: 0.012, shake: 1, tracer: 0x9fe0ff, heat: true, bounce: 3,
+  },
+  {
+    id: 'g_drum', kind: 'rifle', look: 'drum', name: '드럼 산탄총', rarity: 'legendary', price: 16000,
+    desc: '둥근 드럼 탄창을 단 자동 산탄총. 산탄 6발을 쉬지 않고 퍼붓는다.', hold: '두 손 · 드럼 교체',
+    dmg: 6.5, rate: 3.4, mag: 20, reload: 1.9, range: 125, spread: 0.4, pellets: 6, pierce: 0, crit: 0.05, knock: 110, stop: 0.03, shake: 2.6, tracer: 0xffc888,
+  },
+  {
+    id: 'g_dragon', kind: 'minigun', look: 'dragon', name: '용의 숨결', rarity: 'mythic', price: 46000,
+    desc: '불을 머금은 회전포. 달군 탄이 적 둘을 꿰뚫는다. 연료통을 갈아 끼운다.', hold: '허리 견착 · 두 손잡이',
+    dmg: 9, rate: 24, mag: 200, reload: 2.6, range: 185, spread: 0.16, pellets: 1, pierce: 2, crit: 0.08, knock: 30, stop: 0.006, shake: 1, tracer: 0xff7a2a,
+  },
+  {
+    id: 'g_nova', kind: 'railgun', look: 'nova', name: '성운포', rarity: 'mythic', price: 42000,
+    desc: '작은 별을 충전해 쏜다. 빔이 닿은 자리가 크게 폭발한다.', hold: '두 손 · 충전 사격',
+    dmg: 150, rate: 0.7, mag: 4, reload: 2.4, range: 360, spread: 0, pellets: 1, pierce: 0, crit: 0.2, knock: 260, stop: 0.09, shake: 7, tracer: 0xff9af0, splash: 60,
+  },
+  {
+    id: 'g_void', kind: 'sniper', look: 'void', name: '차원 저격총 0', rarity: 'transcendent', price: 88000,
+    desc: '공간째로 꿰뚫는 탄. 모든 것을 관통하고 맞힌 적에게서 두 번 더 튄다.', hold: '두 손 · 노리쇠',
+    dmg: 140, rate: 1.05, mag: 6, reload: 1.8, range: 420, spread: 0, pellets: 1, pierce: 999, crit: 0.4, knock: 200, stop: 0.07, shake: 5, tracer: 0xc89aff, bounce: 2,
+  },
 ];
 
 // ---------------- swords ----------------
 export type SwordKind =
   | 'dagger' | 'longsword' | 'rapier' | 'katana' | 'greatsword' | 'scythe'
   | 'saber' | 'cleaver' | 'katar' | 'spear' | 'nodachi' | 'twinblade' | 'whip' | 'plasma';
+/** how a blade looks: its own art, while `kind` picks the combo, carry and parry handling it shares */
+export type SwordLook =
+  | SwordKind
+  | 'tanto' | 'gladius' | 'axe' | 'halberd' | 'hammer' | 'flamberge' | 'chainsword' | 'glaive' | 'voidblade' | 'starblade';
 
 export interface SwordDef {
   id: string;
   kind: SwordKind;
+  look?: SwordLook;
+  /** each cut also throws a flying crescent for this share of the blade's damage */
+  wave?: number;
   name: string;
   rarity: Rarity;
   price: number;
@@ -225,6 +297,57 @@ export const SWORDS: SwordDef[] = [
     desc: '평소엔 손잡이뿐. 벨 때만 빛의 날이 켜진다.', hold: '허리 · 점화 베기',
     dmg: 42, reach: 34, arc: 3.2, windup: 0.03, swing: 0.07, hold_: 0.04, recover: 0.2, cooldown: 0.42, parry: 0.22, knock: 120, stop: 0.05, color: 0x7af6ff,
   },
+  // ---- second armoury ----
+  {
+    id: 's_tanto', kind: 'dagger', look: 'tanto', name: '탄토', rarity: 'common', price: 300,
+    desc: '짧고 곧은 단도. 단검처럼 손안에서 돌리며 빠르게 벤다.', hold: '역수 · 손 안에서 돌리기',
+    dmg: 13, reach: 22, arc: 2.0, windup: 0.025, swing: 0.07, hold_: 0.02, recover: 0.1, cooldown: 0.32, parry: 0.16, knock: 65, stop: 0.032, color: 0xe4e8f2,
+  },
+  {
+    id: 's_gladius', kind: 'longsword', look: 'gladius', name: '글라디우스', rarity: 'common', price: 360,
+    desc: '넓고 짧은 투사의 검. 롱소드보다 짧지만 묵직하다.', hold: '정수 · 좌우 연속 베기',
+    dmg: 22, reach: 24, arc: 2.5, windup: 0.05, swing: 0.085, hold_: 0.03, recover: 0.18, cooldown: 0.42, parry: 0.17, knock: 130, stop: 0.05, color: 0xdfe6f0,
+  },
+  {
+    id: 's_axe', kind: 'cleaver', look: 'axe', name: '전투 도끼', rarity: 'uncommon', price: 1150,
+    desc: '도끼날로 높이 들어 내리찍는다. 치명타가 잘 나고 적을 크게 밀어낸다.', hold: '한 손 · 내려찍기',
+    dmg: 34, reach: 23, arc: 1.6, windup: 0.09, swing: 0.065, hold_: 0.06, recover: 0.2, cooldown: 0.56, parry: 0.15, knock: 220, stop: 0.075, color: 0xc8ccd8,
+  },
+  {
+    id: 's_halberd', kind: 'spear', look: 'halberd', name: '미늘창', rarity: 'rare', price: 3200,
+    desc: '도끼날과 창끝을 함께 단 장병기. 장창보다 무겁고 강하다.', hold: '두 손 · 회전 후 찌르기',
+    dmg: 34, reach: 50, arc: 0.6, windup: 0.15, swing: 0.065, hold_: 0.06, recover: 0.22, cooldown: 0.7, parry: 0.21, knock: 200, stop: 0.06, color: 0xd0d6e4,
+  },
+  {
+    id: 's_hammer', kind: 'greatsword', look: 'hammer', name: '전쟁 망치', rarity: 'epic', price: 7200,
+    desc: '쇠뭉치를 머리 위에서 내려친다. 맞은 적은 아주 멀리 날아간다.', hold: '어깨 걸침 · 양손 내려치기',
+    dmg: 72, reach: 34, arc: 3.0, windup: 0.14, swing: 0.13, hold_: 0.06, recover: 0.34, cooldown: 1.0, parry: 0.22, knock: 460, stop: 0.11, color: 0xa8b0c4,
+  },
+  {
+    id: 's_flamberge', kind: 'longsword', look: 'flamberge', name: '플랑베르주', rarity: 'epic', price: 8000,
+    desc: '불꽃처럼 물결치는 칼날. 길고 날카로워 치명상을 남긴다.', hold: '정수 · 좌우 연속 베기',
+    dmg: 38, reach: 34, arc: 2.8, windup: 0.055, swing: 0.1, hold_: 0.03, recover: 0.2, cooldown: 0.5, parry: 0.18, knock: 140, stop: 0.06, color: 0xffb070,
+  },
+  {
+    id: 's_chainsword', kind: 'saber', look: 'chainsword', name: '체인소드', rarity: 'legendary', price: 18000,
+    desc: '톱니가 쉴 새 없이 돈다. 한 번 휘두르면 왕복으로 갈아낸다.', hold: '한 손 · 왕복 베기',
+    dmg: 26, reach: 28, arc: 2.4, windup: 0.04, swing: 0.15, hold_: 0.02, recover: 0.16, cooldown: 0.42, parry: 0.17, knock: 80, stop: 0.04, color: 0xff6a4a,
+  },
+  {
+    id: 's_glaive', kind: 'scythe', look: 'glaive', name: '달빛 글레이브', rarity: 'legendary', price: 20000,
+    desc: '초승달 같은 날을 단 장병기. 몸을 감아 돌며 주변을 벤다.', hold: '등 뒤 · 회전 베기',
+    dmg: 50, reach: 44, arc: Math.PI * 2, windup: 0.08, swing: 0.25, hold_: 0.02, recover: 0.24, cooldown: 0.82, parry: 0.24, knock: 170, stop: 0.06, color: 0x9fd8ff,
+  },
+  {
+    id: 's_void', kind: 'katana', look: 'voidblade', name: '공허의 검', rarity: 'mythic', price: 44000,
+    desc: '칼집에서 뽑을 때마다 공간이 갈라져 검기가 날아간다.', hold: '허리 칼집 · 발도술',
+    dmg: 52, reach: 35, arc: 3.6, windup: 0.02, swing: 0.055, hold_: 0.14, recover: 0.28, cooldown: 0.62, parry: 0.2, knock: 150, stop: 0.07, color: 0xb08aff, wave: 0.7,
+  },
+  {
+    id: 's_star', kind: 'plasma', look: 'starblade', name: '별의 검', rarity: 'transcendent', price: 90000,
+    desc: '별빛으로 된 칼날. 벨 때마다 빛의 검기가 적을 꿰뚫으며 날아간다.', hold: '허리 · 점화 베기',
+    dmg: 60, reach: 38, arc: 3.2, windup: 0.03, swing: 0.07, hold_: 0.04, recover: 0.2, cooldown: 0.4, parry: 0.24, knock: 140, stop: 0.06, color: 0xfff0a8, wave: 0.9,
+  },
 ];
 
 // ---------------- skins ----------------
@@ -254,6 +377,8 @@ export const SKINS: SkinDef[] = [
   { id: 'k_lava', name: '용암 코어', rarity: 'epic', price: 6200, kind: 'lava', a: 0xff7a1a, b: 0x2a1410, desc: '갈라진 틈으로 용암이 흐른다.' },
   { id: 'k_galaxy', name: '은하 큐브', rarity: 'legendary', price: 14500, kind: 'galaxy', a: 0x8a6bff, b: 0x120a2e, desc: '내부에서 별이 반짝인다.' },
   { id: 'k_prism', name: '프리즘', rarity: 'legendary', price: 16500, kind: 'prism', a: 0xffffff, b: 0x888888, desc: '무지갯빛으로 변하며 잔상을 남긴다.' },
+  { id: 'k_crimson', name: '진홍 왕관', rarity: 'mythic', price: 38000, kind: 'gold', a: 0xff4a5e, b: 0x7a1020, desc: '피처럼 붉은 금속에 빛이 흐른다.' },
+  { id: 'k_aurora', name: '오로라', rarity: 'transcendent', price: 75000, kind: 'galaxy', a: 0x7af6ff, b: 0x0a2a3a, desc: '극지의 하늘을 담은 큐브. 빛의 띠가 흐른다.' },
 ];
 
 export const ENHANCE_MAX = 5;
@@ -320,6 +445,9 @@ export const UPGRADES: Upgrade[] = [
   { id: 'dc', tag: '몸', name: '순보', desc: '대시 쿨타임 -18%', max: 3, apply: (m) => (m.dashCd -= 0.18) },
   { id: 'gm', tag: '몸', name: '탐욕', desc: '골드 획득 +20%', max: 3, apply: (m) => (m.goldMul += 0.2) },
 ];
+
+export const gunLook = (d: GunDef): GunLook => d.look ?? d.kind;
+export const swordLook = (d: SwordDef): SwordLook => d.look ?? d.kind;
 
 export const gunById = (id: string) => GUNS.find((g) => g.id === id) ?? GUNS[0];
 export const swordById = (id: string) => SWORDS.find((s) => s.id === id) ?? SWORDS[0];

@@ -2,7 +2,7 @@
 // Local frame: origin at the gripping hand, +x along the barrel / blade, +y "below".
 import { Gfx, Xf } from '../engine/gfx';
 import { TAU, hash2, hsv, mix } from '../engine/math';
-import type { GunKind, SkinDef, SwordKind } from './data';
+import type { GunLook, SkinDef, SwordLook } from './data';
 
 // palette
 const K = {
@@ -54,7 +54,18 @@ export const blankPose = (): GunPose => ({
   slide: 0, mag: 0, cyl: 0, pump: 0, bolt: 0, boltUp: 0, handle: 0, box: 0, barrel: 0, gap: 0, cells: 4, charge: 0, cell: 0, tip: 0, lever: 0, brk: 0, drum: 0, drumOut: 0, heat: 0, fins: 0, rod: -1, hammer: 1, pan: 0, hand2: null, handC: 0x999999,
 });
 
-export const MUZZLE: Record<GunKind, [number, number]> = {
+export const MUZZLE: Record<GunLook, [number, number]> = {
+  mpistol: [12, -3],
+  flare: [10.5, -3.2],
+  nailgun: [13.5, -2.8],
+  crossbow: [15, -2.6],
+  harpoon: [19, -3.2],
+  blunder: [20, -3.4],
+  tesla: [15.5, -3],
+  drum: [18.5, -3.6],
+  dragon: [23, -4],
+  nova: [20, -3.5],
+  void: [25, -3.1],
   pistol: [10, -3],
   revolver: [13, -3.5],
   smg: [14, -2.5],
@@ -72,7 +83,9 @@ export const MUZZLE: Record<GunKind, [number, number]> = {
   launcher: [19, -4],
 };
 /** where casings leave the gun */
-export const PORT: Record<GunKind, [number, number]> = {
+export const PORT: Record<GunLook, [number, number]> = {
+  mpistol: [3, -4], flare: [1, -4], nailgun: [5, -4], crossbow: [3, -3], harpoon: [-1, -5], blunder: [-1, -5], tesla: [2, -5],
+  drum: [3, -5], dragon: [-2, -2], nova: [-4, -4], void: [-1, -4],
   pistol: [3, -4], revolver: [1, -3], smg: [4, -4], shotgun: [1, -4], sniper: [-1, -4], minigun: [-2, -2], railgun: [-4, -4],
   derringer: [1, -4], lever: [1, -5], rifle: [3, -5], laser: [2, -5], dbarrel: [2, -3], cannon: [4, -5.5], musket: [-1, -5], launcher: [2, -5],
 };
@@ -85,9 +98,236 @@ export function hand(x: Xf, u: number, v: number, c: number) {
   x.q(u - 2, v + 1, 4, 1, mix(c, 0x000000, 0.3));
 }
 
-export function drawGun(x: Xf, kind: GunKind, p: GunPose, time: number) {
+export function drawGun(x: Xf, kind: GunLook, p: GunPose, time: number) {
   const g = x.g;
   switch (kind) {
+    case 'mpistol': {
+      const s = -p.slide * 3;
+      x.q(-2, -1, 3, 4, K.dark); // grip
+      x.q(-2, -1, 1, 4, K.metal);
+      if (p.mag >= 0) {
+        x.q(-1.8, 3 + p.mag, 2.6, 4.5, K.ink); // extended magazine
+        x.q(-1.8, 3 + p.mag, 0.8, 4.5, K.metal);
+      }
+      x.q(-1, -2, 9, 1.5, K.metal);
+      x.q(2, -1, 2, 1.5, K.dark);
+      x.q(-2 + s, -4, 11, 2, 0x3a3e52); // dark slide
+      x.q(-2 + s, -4, 11, 1, K.steel);
+      x.q(3 + s, -3.4, 1, 0.8, K.ink);
+      x.q(5 + s, -3.4, 1, 0.8, K.ink);
+      x.q(9, -4.3, 3, 2.6, K.dark); // compensator
+      x.q(9.6, -4.7, 0.8, 0.8, 0xff8a3a);
+      x.q(-3, -2.4, 1.2, 1, 0xff8a3a); // fire selector
+      break;
+    }
+    case 'flare': {
+      x.q(-2.5, -1, 3.2, 4, 0xd8541e); // orange polymer grip
+      x.q(-2.5, -1, 1, 4, 0xff7a3a);
+      x.q(-2.2, -3.2, 4.4, 2.4, 0xc84a1a); // frame
+      x.q(0.5, -1, 1.5, 1.2, K.dark);
+      x.q(-2.8, -4.2, 1.4, 1, K.dark); // hammer
+      const [hx, hy] = x.pt(1.5, -2.4);
+      const B = new Xf(x.g, hx, hy, x.ang - p.tip * 1.1 * x.fy, x.fy);
+      B.q(0, -2.4, 9, 3.2, 0xe0602a); // fat barrel
+      B.q(0, -2.4, 9, 1, 0xff9a5a);
+      B.q(8, -2.8, 1.4, 4, K.dark);
+      if (p.tip > 0.3) B.q(-0.4, -1.8, 0.8, 2, 0xff3a2a); // the shell
+      break;
+    }
+    case 'nailgun': {
+      x.q(-1, -1, 2.4, 4, K.dark); // grip
+      x.q(-4, -5, 12, 4.2, 0xe8b830); // tool body
+      x.q(-4, -5, 12, 1, 0xffe070);
+      x.q(-4, -1, 3, 2, 0xc89820);
+      x.q(-3, -3.6, 2, 1, K.ink); // vent
+      if (p.mag >= 0) {
+        x.q(6, -1 + p.mag, 1, 6.5, K.metal); // nail strip
+        for (let i = 0; i < 5; i++) x.q(6.8, -0.6 + p.mag + i * 1.2, 3, 0.5, K.light);
+      }
+      x.q(8, -4, 5, 2.4, K.metal); // nose
+      x.q(12.5, -3.6, 1.2, 1.6, K.dark);
+      x.q(4 - p.handle * 3, -6, 2, 1, K.dark);
+      break;
+    }
+    case 'crossbow': {
+      x.q(-12, -3, 10, 3, K.wood); // stock
+      x.q(-12, -3, 10, 1, K.woodL);
+      x.q(-12, -4, 2, 5, K.wood);
+      x.q(-2, -3.6, 16, 2.4, K.wood); // tiller
+      x.q(-2, -3.6, 16, 0.8, K.woodL);
+      x.q(-1, -1.2, 1.6, 2, K.dark); // trigger
+      x.q(12.5, -10, 1.6, 14, K.metal); // prod
+      x.q(12.5, -10, 0.6, 14, K.steel);
+      x.q(14, -3.4, 1.2, 2, K.metal); // stirrup
+      // the string is re-drawn after every shot (it snaps forward, then is hauled back to the nut)
+      const su = 3 + p.bolt * 9;
+      const [ax, ay] = x.pt(13, -9.6), [bx, by] = x.pt(su, -2.4), [cx, cy] = x.pt(13, 3.6);
+      g.line(ax, ay, bx, by, 0xe8e0c8);
+      g.line(bx, by, cx, cy, 0xe8e0c8);
+      if (p.bolt < 0.35) {
+        x.q(su, -2.9, 11, 0.8, 0xd8c8a0); // bolt on the rail
+        x.tri(su + 11, -3.6, su + 11, -1.6, su + 13.5, -2.6, K.light);
+        x.q(su, -3.3, 2, 0.5, 0xd84a3a);
+      }
+      break;
+    }
+    case 'harpoon': {
+      x.q(-12, -3, 11, 3.4, K.wood); // stock
+      x.q(-12, -3, 11, 1, K.woodL);
+      x.q(-13, -4, 2, 5.4, K.wood);
+      x.q(-7, -0.2, 4, 2.4, 0xc8b080); // coiled line
+      x.q(-7, 0.6, 4, 0.5, 0x9a8458);
+      x.q(-1, -5, 20, 3.6, K.metal); // heavy barrel
+      x.q(-1, -5, 20, 1, K.steel);
+      x.q(4, -5.4, 1.2, 4.4, K.brass);
+      x.q(13, -5.4, 1.2, 4.4, K.brass);
+      x.q(0, -1.4, 14, 2, K.woodL); // forestock
+      // the harpoon: head out of the muzzle when loaded, pushed down the barrel while reloading
+      const out = p.rod < 0 ? 4 : (1 - p.rod) * 16;
+      x.q(19, -3.6, out, 0.9, 0xd8c8a0);
+      x.tri(19 + out, -4.7, 19 + out, -2, 22.5 + out, -3.3, K.light);
+      x.tri(19 + out, -4.7, 20.5 + out, -3.3, 18.2 + out, -5.8, K.steel);
+      x.tri(19 + out, -2, 20.5 + out, -3.3, 18.2 + out, -0.8, K.steel);
+      const [hx, hy] = x.pt(-2.5, -5);
+      const H = new Xf(x.g, hx, hy, x.ang + (-0.9 + p.hammer * 1.5) * x.fy, x.fy);
+      H.q(-0.5, -3, 1.2, 3, K.dark);
+      if (p.pan > 0) x.glow(0.5, -5.6, 6, 0xffb060, 0.9 * p.pan);
+      break;
+    }
+    case 'blunder': {
+      if (p.rod >= 0) x.q(19 - p.rod * 14, -3.9, 16, 0.7, 0xd8c8a0);
+      x.q(-13, -3, 12, 3.2, K.wood);
+      x.q(-13, -3, 12, 1, K.woodL);
+      x.q(-14, -4, 2, 5.4, K.wood);
+      x.q(0, -2.4, 12, 1.8, K.woodL);
+      x.q(0, -4.4, 16, 2, K.brass); // brass barrel
+      x.q(0, -4.4, 16, 0.7, 0xffe08a);
+      // the flared bell mouth
+      x.tri(16, -4.4, 20, -6.6, 20, -0.2, K.brass);
+      x.tri(16, -4.4, 16, -2.4, 20, -0.2, K.brass);
+      x.q(19.4, -6.6, 0.9, 6.4, K.brassD);
+      x.q(-3.5, -4.8, 5, 2.4, K.metal);
+      x.q(-0.5, -5.2, 2, 1, K.brass);
+      const [hx, hy] = x.pt(-2.5, -4.5);
+      const H = new Xf(x.g, hx, hy, x.ang + (-0.9 + p.hammer * 1.5) * x.fy, x.fy);
+      H.q(-0.5, -3, 1.2, 3, K.dark);
+      H.q(-0.6, -3.6, 1.6, 1, 0x9a8a70);
+      if (p.pan > 0) {
+        x.q(0, -6.5, 1.5, 1.5, 0xffffff, p.pan);
+        x.glow(0.5, -5.6, 6, 0xffb060, 0.9 * p.pan);
+      }
+      break;
+    }
+    case 'tesla': {
+      const heatC = mix(0x9fe0ff, 0xffffff, p.heat);
+      x.q(-2, -1, 3, 4, 0x2a2a3a);
+      x.q(-3, -5, 8, 4, 0x3a3a50);
+      x.q(-3, -5, 8, 1, 0x5a5a74);
+      const fo = p.fins * 2;
+      x.q(-2, -6 - fo, 6, 1, 0x5a5a74); // vent lid
+      x.q(-1, -3.8, 4, 1.4, heatC);
+      x.q(5, -3.6, 7, 1.2, K.metal);
+      for (let i = 0; i < 4; i++) {
+        x.q(5 + i * 1.6, -5.6, 1, 5.2, 0xc87a3a); // copper coils
+        x.q(5 + i * 1.6, -5.6, 1, 1, 0xffb070);
+      }
+      x.disc(13, -3, 2.6, 0x2a3a50);
+      x.disc(13, -3, 1.8, heatC);
+      x.glow(13, -3, 7, 0x9fe0ff, 0.3 + p.heat * 0.4);
+      // little arcs crawl over the sphere
+      const [sx, sy] = x.pt(13, -3);
+      for (let k = 0; k < 2; k++) {
+        const a = time * 37 + k * 2.6;
+        const [ex, ey] = x.pt(13 + Math.cos(a) * 4, -3 + Math.sin(a) * 4);
+        g.line(sx, sy, ex, ey, 0xd8f4ff, 0.6);
+      }
+      break;
+    }
+    case 'drum': {
+      x.q(-10, -3.8, 6, 3.2, K.dark); // stock
+      x.q(-10, -4.2, 1.2, 4.6, K.dark);
+      x.q(-1, -1, 2, 3.5, K.dark); // grip
+      if (p.mag >= 0) {
+        x.disc(4, 1.6 + p.mag, 3.6, K.ink); // drum
+        x.disc(4, 1.6 + p.mag, 2.6, K.metal);
+        x.disc(4, 1.6 + p.mag, 1, K.dark);
+      }
+      x.q(-3, -5, 10, 4, K.metal); // receiver
+      x.q(-3, -5, 10, 1, K.steel);
+      x.q(7, -4.6, 11, 2, K.light); // barrel
+      x.q(7, -4.6, 11, 0.7, K.shine);
+      x.q(7, -2.6, 9, 1.6, K.dark); // handguard
+      x.q(17, -5, 1.5, 2.8, K.dark);
+      x.q(-2 - p.handle * 3, -5.8, 1.6, 0.8, K.steel);
+      break;
+    }
+    case 'dragon': {
+      const ph = p.barrel;
+      for (let i = 0; i < 3; i++) {
+        const v = -6 + i * 1.6 + Math.sin(ph + i * 2.1) * 0.6;
+        x.q(2, v, 15, 1.2, Math.cos(ph + i * 2.1) > 0 ? 0xd8a050 : 0x7a3a20);
+      }
+      x.q(8, -6.5, 1.5, 5, 0x5a2a20); // clamp
+      x.q(16, -7.5, 4, 7, 0xa02a1a); // dragon head
+      x.q(16, -7.5, 4, 1.4, 0xd84a2a);
+      x.tri(20, -7.5, 20, -0.5, 23, -4, 0xc83a1a);
+      x.q(17, -6.6, 1, 1, 0xffd040); // eye
+      x.q(20.2, -5.2, 1, 0.6, 0xffffff); // fangs
+      x.q(20.2, -3.4, 1, 0.6, 0xffffff);
+      x.glow(22, -4, 6, 0xff7a2a, 0.3);
+      x.q(-7, -7, 9, 7, 0x5a2a20); // motor
+      x.q(-7, -7, 9, 1, 0x8a4a30);
+      x.q(-4, -9, 6, 1.5, K.dark); // top handle
+      x.q(-4, -9, 1, 3, K.dark);
+      x.q(1, -9, 1, 3, K.dark);
+      if (p.box >= 0) {
+        x.q(-7, 0 + p.box, 7, 5, 0xb8302a); // fuel tank
+        x.q(-7, 0 + p.box, 7, 1, 0xff6a4a);
+        x.q(-5, 1.6 + p.box, 3, 2, 0xffd040);
+        x.q(-1, -1 + p.box * 0.5, 1, 2, K.dark);
+      }
+      break;
+    }
+    case 'nova': {
+      const gp = p.gap * 2;
+      x.q(-9, -5, 8, 5, 0x4a2a5a);
+      x.q(-9, -5, 8, 1, 0x7a4a8a);
+      x.q(-6, 0, 2, 3.5, K.dark);
+      if (p.cell >= 0) {
+        x.q(-8, -1 + p.cell, 3, 2, 0xff9af0);
+        x.q(-8, -1 + p.cell, 3, 1, 0xffd8fa);
+      }
+      x.q(0, -4.6, 18, 3.2, 0x1a0a24); // bore
+      for (let i = 0; i < 4; i++) {
+        const lit = p.cells > i ? Math.min(1, p.cells - i) : 0;
+        x.q(1 + i * 4, -6.5, 2.4, 7, lit > 0 ? mix(0x5a2a6a, 0xff9af0, lit) : 0x3a1a4a);
+      }
+      x.q(0, -7.5 - gp, 20, 1.2, 0xc89ad8);
+      x.q(0, 0.3 + gp, 20, 1.2, 0xc89ad8);
+      x.q(18, -7, 2, 8, 0x7a4a8a);
+      // a small star grows in the bore while it charges
+      const r = 1.2 + p.charge * 2.6;
+      x.disc(9, -3, r, mix(0xff9af0, 0xffffff, p.charge));
+      x.glow(9, -3, 4 + r * 3, 0xff9af0, 0.25 + p.charge * 0.6);
+      break;
+    }
+    case 'void': {
+      x.q(-12, -3.2, 10, 3.2, 0x1a1428);
+      x.q(-12, -3.2, 10, 0.8, 0x3a2a58);
+      x.q(-12.5, -4, 1.6, 5, 0x1a1428);
+      x.q(-2, -4.4, 16, 3, 0x241a38);
+      x.q(-2, -4.4, 16, 0.8, 0x4a3a70);
+      x.q(0, -2.6, 14, 0.6, 0xc89aff); // glowing seam
+      x.glow(7, -2.3, 8, 0xc89aff, 0.2 + 0.1 * Math.sin(time * 4));
+      x.q(14, -3.8, 11, 1.4, 0x120c1e);
+      for (let i = 0; i < 3; i++) x.q(16 + i * 3, -4.2, 0.8, 2.2, 0xc89aff);
+      x.q(1, -7.4, 8, 1.6, 0x241a38); // scope
+      x.q(8.6, -7.4, 1, 1.6, 0xff9af0);
+      const bb = -p.bolt * 3;
+      x.q(-2 + bb, -4.9, 3, 1, 0xc89aff);
+      x.q(-1 + bb, -0.5 - p.boltUp * 3.5, 1.6, 1.6, 0x4a3a70);
+      break;
+    }
     case 'pistol': {
       const s = -p.slide * 3;
       x.q(-2, -1, 3, 4, K.dark); // grip
@@ -411,7 +651,17 @@ export function drawGun(x: Xf, kind: GunKind, p: GunPose, time: number) {
 }
 
 // ---------------- swords ----------------
-export const BLADE_LEN: Record<SwordKind, number> = {
+export const BLADE_LEN: Record<SwordLook, number> = {
+  tanto: 10,
+  gladius: 16,
+  axe: 16,
+  halberd: 31,
+  hammer: 24,
+  flamberge: 28,
+  chainsword: 17,
+  glaive: 18,
+  voidblade: 20,
+  starblade: 22,
   dagger: 9,
   longsword: 17,
   rapier: 23,
@@ -429,10 +679,160 @@ export const BLADE_LEN: Record<SwordKind, number> = {
 };
 
 /** `amt`: plasma ignition / whip blade closed (1) or flying out as a chain (handled by the controller) */
-export function drawSword(x: Xf, kind: SwordKind, color: number, time: number, sheathed = false, amt = 1, chainOut = false) {
+export function drawSword(x: Xf, kind: SwordLook, color: number, time: number, sheathed = false, amt = 1, chainOut = false) {
   const hi = mix(color, 0xffffff, 0.6);
   const lo = mix(color, 0x202030, 0.45);
   switch (kind) {
+    case 'tanto': {
+      x.q(-4.5, -1, 4.5, 2, 0x2a1e2a);
+      for (let i = 0; i < 2; i++) x.tri(-4 + i * 2, -1, -3 + i * 2, 0, -4 + i * 2, 1, 0xd8d0e8);
+      x.q(0, -1.8, 0.8, 3.6, K.brass);
+      x.q(1, -1.1, 8, 2.2, lo);
+      x.q(1, -1.1, 8, 0.8, color);
+      x.q(1, 0.6, 8, 0.5, 0xffffff);
+      x.tri(9, -1.1, 9, 1.1, 11, -0.6, color);
+      break;
+    }
+    case 'gladius': {
+      x.disc(-5.5, 0, 1.4, K.brass); // pommel
+      x.q(-4.5, -1, 4.5, 2, 0x4a2a1a);
+      x.q(-0.4, -2.6, 1.6, 5.2, K.brass);
+      // broad leaf blade
+      x.q(1.5, -1.8, 12, 3.6, lo);
+      x.q(1.5, -1.8, 12, 1.8, color);
+      x.q(2, -1.8, 11, 0.6, hi);
+      x.tri(13.5, -1.8, 13.5, 1.8, 17, 0, color);
+      break;
+    }
+    case 'axe': {
+      x.q(-6, -0.9, 20, 1.8, K.wood); // haft
+      x.q(-6, -0.9, 20, 0.6, K.woodL);
+      x.q(-6.5, -1.2, 1, 2.4, K.metal);
+      x.q(10, -2.2, 3, 4.4, K.metal); // socket
+      x.q(10.5, -6, 4, 8.4, lo); // bearded bit
+      x.tri(14.5, -6, 14.5, 2.4, 17, 4.6, lo);
+      x.tri(14.5, -6, 17, -7.6, 14.5, 2.4, lo);
+      x.q(10.5, -6, 4, 1.4, color);
+      x.tri(16.6, -7.4, 17.2, -7.4, 16.8, 4.4, 0xffffff); // edge
+      break;
+    }
+    case 'halberd': {
+      x.q(-18, -0.8, 40, 1.6, 0x4a3020);
+      x.q(-18, -0.8, 40, 0.5, 0x6a4a30);
+      x.q(-18.5, -1.1, 1.2, 2.2, K.metal);
+      x.q(21.5, -1.2, 2.2, 2.4, K.brass);
+      x.q(22, -6.2, 5, 5.4, lo); // axe blade
+      x.q(22, -6.2, 5, 1.4, color);
+      x.q(26.4, -6.2, 0.7, 5.4, 0xffffff);
+      x.tri(23, 0.8, 26, 0.8, 24, 3.6, K.metal); // back hook
+      x.tri(23.5, -1.4, 23.5, 1.4, 31, 0, color); // spike
+      break;
+    }
+    case 'hammer': {
+      x.q(-9, -1, 26, 2, 0x3a2a30); // haft
+      for (let i = 0; i < 4; i++) x.q(-8 + i * 2, -1, 0.8, 2, 0x5a4a50);
+      x.q(-9.5, -1.4, 1.2, 2.8, 0x6a6e80);
+      x.q(17, -5, 7, 10, 0x5a5e70); // head
+      x.q(17, -5, 7, 2, 0x8a8ea0);
+      x.q(23, -5, 1, 10, 0x3a3e50);
+      x.tri(17, -5, 17, -2, 13.5, -3.5, 0x6a6e80); // back spike
+      for (let i = 0; i < 2; i++) {
+        const k = 0.5 + 0.5 * Math.sin(time * 4 + i * 2);
+        x.q(19 + i * 2, -1, 1, 1, mix(0x2a3a6a, 0x7ab0ff, k));
+        x.glow(19.5 + i * 2, -0.5, 3, 0x7ab0ff, 0.12 * k);
+      }
+      break;
+    }
+    case 'flamberge': {
+      x.q(-7, -1, 7, 2, 0x3a2030);
+      x.q(-7.5, -1.2, 0.8, 2.4, K.brass);
+      x.q(0, -4, 1.4, 8, K.brass);
+      x.q(-0.6, -4.4, 1, 1, K.brass);
+      x.q(-0.6, 3.4, 1, 1, K.brass);
+      x.q(1.4, -1.2, 3, 2.4, lo); // ricasso
+      for (let i = 0; i < 9; i++) {
+        const off = Math.sin(i * 1.4) * 0.7;
+        x.q(4 + i * 2.6, -1.4 + off, 2.8, 2.8, lo);
+        x.q(4 + i * 2.6, -1.4 + off, 2.8, 1.1, color);
+        x.q(4 + i * 2.6, 1 + off, 2.8, 0.4, 0xffffff);
+      }
+      x.tri(27.4, -1.4, 27.4, 1.4, 30, 0, color);
+      x.glow(15, 0, 10, color, 0.08);
+      break;
+    }
+    case 'chainsword': {
+      x.q(-5, -1.2, 5, 2.4, 0x2a2a32);
+      x.q(-3, -2.4, 2.5, 1.2, 0xff6a4a); // engine
+      x.q(-0.5, -3, 1.6, 6, 0x3a3a44);
+      x.q(1, -2, 15, 4, 0x4a4e5c); // bar
+      x.q(1, -2, 15, 1, 0x7a7e8c);
+      x.disc(16, 0, 2, 0x4a4e5c);
+      // teeth running round the bar
+      const ph = (time * 40) % 2;
+      for (let i = 0; i < 8; i++) {
+        x.q(1.5 + i * 2 + ph, -2.8, 1, 0.8, 0xff6a4a);
+        x.q(15.5 - i * 2 - ph, 1.9, 1, 0.8, 0xff6a4a);
+      }
+      break;
+    }
+    case 'glaive': {
+      x.q(-16, -1, 34, 2, 0x1e2a3a);
+      x.q(-16, -1, 34, 0.7, 0x3a4a5e);
+      x.q(-17, -1.5, 1.5, 3, 0x9fb8d0);
+      x.q(17, -2, 2, 4, 0x9fb8d0);
+      // a long crescent knife-blade carrying on from the haft
+      for (let i = 0; i < 8; i++) {
+        const u = 19 + i * 1.8, v = -(i * i) * 0.09;
+        const w = 3.6 * (1 - i / 10);
+        x.q(u, v - w / 2, 2, w, lo);
+        x.q(u, v - w / 2, 2, w * 0.4, color);
+        x.glow(u, v, 4, 0x9fd8ff, 0.06);
+      }
+      x.tri(33.4, -5.1, 33.4, -3.9, 35.5, -5.8, color);
+      break;
+    }
+    case 'voidblade': {
+      x.q(-7, -1, 7, 2, 0x120c1e);
+      for (let i = 0; i < 3; i++) x.tri(-6.5 + i * 2.2, -1, -5.4 + i * 2.2, 0, -6.5 + i * 2.2, 1, 0x8a6ad0);
+      x.q(-7.5, -1, 0.8, 2, 0xc89aff);
+      x.q(0, -2.2, 1, 4.4, 0x3a2a58);
+      if (sheathed) {
+        x.q(1, -1.6, 19, 3.2, 0x120c1e);
+        x.q(1, -1.6, 19, 0.8, 0x4a3a70);
+        x.q(19, -1.6, 1.5, 3.2, 0xc89aff);
+      } else {
+        for (let i = 0; i < 6; i++) {
+          const u = 1 + i * 3, curve = -(i * i) * 0.05;
+          x.q(u, -1 + curve, 3.2, 2, 0x1a1028);
+          x.q(u, 0.4 + curve, 3.2, 0.6, color); // violet edge
+        }
+        x.tri(19, -2.25, 19, -0.25, 21, -1.6, color);
+        x.glow(10, -0.5, 10, color, 0.15);
+      }
+      break;
+    }
+    case 'starblade': {
+      x.q(-5, -1.3, 6, 2.6, 0xc8a050);
+      x.q(-4, -1.3, 0.8, 2.6, 0x7a5a20);
+      x.q(-1.8, -1.3, 0.8, 2.6, 0x7a5a20);
+      x.q(1, -1.8, 1.2, 3.6, 0xffe08a);
+      x.q(-5.6, -0.6, 0.6, 1.2, 0xffffff);
+      if (amt > 0.01) {
+        const L = 21 * amt;
+        x.q(2.2, -1.9, L, 3.8, color, 0.5);
+        x.q(2.2, -1.1, L, 2.2, mix(color, 0xffffff, 0.6));
+        x.q(2.2, -0.5, L + 0.5, 1, 0xffffff);
+        x.tri(2.2 + L, -1.1, 2.2 + L, 1.1, 4 + L, 0, 0xffffff);
+        // stars caught in the blade
+        for (let i = 0; i < 3; i++) {
+          const u = 4 + ((time * 9 + i * 7) % Math.max(1, L - 2));
+          x.q(u, -0.6 + Math.sin(i * 5) * 0.8, 0.8, 0.8, 0xffffff);
+        }
+        const [ax, ay] = x.pt(2.2, 0), [bx, by] = x.pt(2.2 + L, 0);
+        x.g.glowLine(ax, ay, bx, by, 7, color, 0.5 * amt);
+      }
+      break;
+    }
     case 'dagger': {
       x.q(-4, -1, 4, 2, 0x5a3a2a);
       x.q(-4, -1, 4, 0.8, 0x80563c);
