@@ -25,6 +25,10 @@ export interface Shot {
   py: number;
   /** how it is drawn */
   kind?: 'crescent' | 'blade' | 'saw';
+  /** the enemy that fired it: a parried shot is sent back to it */
+  owner?: Enemy;
+  /** a parried shot steers into this enemy */
+  home?: Enemy;
   /** a boomerang: flies out, brakes, and homes back to the enemy that threw it */
   boom?: { owner: Enemy; back: boolean; spin: number };
   /** lobbed shells fly over everything and burst where they land */
@@ -90,6 +94,8 @@ export class Run {
   enemies: Enemy[] = [];
   shots: Shot[] = [];
   waves: Wave[] = [];
+  /** the enemy whose update is running: anything it fires is marked as its own */
+  private shooter: Enemy | null = null;
   drops: Drop[] = [];
   world: WorldDef;
   mods: Mods = baseMods();
@@ -275,7 +281,10 @@ export class Run {
     sfx.reflect();
     const p = this.player;
     const a = Math.atan2(p.y - e.y, p.x - e.x);
+    const prev = this.shooter;
+    this.shooter = e;
     this.enemyShot(bx, by, Math.cos(a) * 165, Math.sin(a) * 165, e.dmg * 0.45, 2.5, 0xd8c8ff);
+    this.shooter = prev;
   }
 
   kill(e: Enemy, kx: number, ky: number) {
@@ -441,9 +450,11 @@ export class Run {
     s.pierce = perfect ? 4 : 2;
     s.dmg = Math.max(18, s.dmg * 3) * this.mods.swordDmg * (perfect ? 2 : 1);
     s.c = perfect ? 0xffe46a : 0x8ff3ff;
-    s.life = 1.6;
     s.r = 3;
-    const t = this.nearestEnemy(s.x, s.y, 220);
+    // straight back to whoever fired it; if it is gone, to the nearest enemy
+    const t = s.owner && !s.owner.dead ? s.owner : this.nearestEnemy(s.x, s.y, 220);
+    s.home = t ?? undefined;
+    s.life = t ? 2.5 : 1.6;
     const a = t ? Math.atan2(t.y - s.y, t.x - s.x) : Math.atan2(-s.vy, -s.vx);
     const sp = 300;
     s.vx = Math.cos(a) * sp;
@@ -502,7 +513,7 @@ export class Run {
 
   enemyShot(x: number, y: number, vx: number, vy: number, dmg: number, r: number, c: number, kind?: Shot['kind'], force = false) {
     if (!force && this.hostileShots() >= this.shotCap()) return;
-    this.shots.push({ x, y, vx, vy, r, dmg, life: 4.5, friendly: false, c, pierce: 0, hit: null, px: x, py: y, kind });
+    this.shots.push({ x, y, vx, vy, r, dmg, life: 4.5, friendly: false, c, pierce: 0, hit: null, px: x, py: y, kind, owner: this.shooter ?? undefined });
   }
 
   /** a shell lobbed at (tx,ty): it lands after dur seconds and bursts into n bullets */
@@ -510,7 +521,7 @@ export class Run {
     if (this.hostileShots() >= this.shotCap() + 4) return;
     this.shots.push({
       x: sx, y: sy, vx: 0, vy: 0, r: 3, dmg, life: dur + 1, friendly: false, c, pierce: 0, hit: null, px: sx, py: sy,
-      lob: { sx, sy, tx, ty, t: 0, dur, n, z: 0 },
+      lob: { sx, sy, tx, ty, t: 0, dur, n, z: 0 }, owner: this.shooter ?? undefined,
     });
   }
 
@@ -520,7 +531,7 @@ export class Run {
     const x = e.x + Math.cos(a) * (e.r + 3), y = e.y + Math.sin(a) * (e.r + 3);
     this.shots.push({
       x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, r: 4, dmg: e.dmg, life: 4, friendly: false, c: e.spec.color,
-      pierce: 0, hit: null, px: x, py: y, kind: 'saw', boom: { owner: e, back: false, spin: 0 },
+      pierce: 0, hit: null, px: x, py: y, kind: 'saw', boom: { owner: e, back: false, spin: 0 }, owner: e,
     });
   }
 
@@ -539,10 +550,12 @@ export class Run {
     this.shake(2);
     sfx.play('slam2', { vol: 0.35, rate: 1.4, jitter: 0.1, gate: 60 });
     const off = rand(0, TAU);
+    this.shooter = s.owner ?? null;
     for (let i = 0; i < L.n; i++) {
       const a = off + (i / L.n) * TAU;
       this.enemyShot(L.tx, L.ty, Math.cos(a) * 72, Math.sin(a) * 72, s.dmg, 2.5, s.c, undefined, true);
     }
+    this.shooter = null;
   }
 
   hurtPlayer(dmg: number, fromAng: number) {
@@ -768,7 +781,12 @@ export class Run {
     p.update(dt, this.demo ? null : this.input, this.clock);
 
     // enemies
-    for (const e of this.enemies) if (!e.dead) e.update(this, dt);
+    for (const e of this.enemies)
+      if (!e.dead) {
+        this.shooter = e;
+        e.update(this, dt);
+      }
+    this.shooter = null;
     this.separate();
     this.enemies = this.enemies.filter((e) => !e.dead && Math.hypot(e.x - p.x, e.y - p.y) < 700);
 
@@ -787,6 +805,16 @@ export class Run {
           this.burst(s);
         }
         continue;
+      }
+      if (s.friendly && s.home) {
+        const h = s.home;
+        if (h.dead) s.home = undefined;
+        else {
+          const dx = h.x - s.x, dy = h.y - s.y, d = Math.hypot(dx, dy) || 1;
+          const sp = Math.hypot(s.vx, s.vy) || 300;
+          s.vx += ((dx / d) * sp - s.vx) * Math.min(1, dt * 9);
+          s.vy += ((dy / d) * sp - s.vy) * Math.min(1, dt * 9);
+        }
       }
       if (s.boom) {
         const B = s.boom;
