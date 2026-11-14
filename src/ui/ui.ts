@@ -36,15 +36,22 @@ const PV_W = 46, PV_H = 22;
 const pvG = new Gfx(PV_W, PV_H);
 pvG.vignette = 0;
 pvG.buildVignette();
-const pvCanvas = document.createElement('canvas');
-pvCanvas.width = PV_W;
-pvCanvas.height = PV_H;
-const pvCtx = pvCanvas.getContext('2d')!;
 
 type Item = { cat: ShopCat; id: string };
-const animated: { canvas: HTMLCanvasElement; item: Item }[] = [];
+const animated: { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D; item: Item }[] = [];
+// only cards that are actually on screen keep animating
+const onScreen = new WeakSet<Element>();
+const watcher =
+  typeof IntersectionObserver !== 'undefined'
+    ? new IntersectionObserver((es) => es.forEach((e) => (e.isIntersecting ? onScreen.add(e.target) : onScreen.delete(e.target))))
+    : null;
 
-function paintPreview(canvas: HTMLCanvasElement, item: Item, time: number) {
+/** the card canvas is written straight with putImageData (a CPU-side canvas, no GPU round trip per card) */
+function cardCtx(c: HTMLCanvasElement) {
+  return c.getContext('2d', { willReadFrequently: true })!;
+}
+
+function paintPreview(ctx: CanvasRenderingContext2D, item: Item, time: number) {
   const g = pvG;
   g.ox = 0;
   g.oy = 0;
@@ -69,26 +76,38 @@ function paintPreview(canvas: HTMLCanvasElement, item: Item, time: number) {
     const def = skinById(item.id);
     drawCube(g, def, PV_W / 2, PV_H / 2, 12, Math.sin(time * 1.5) * 0.12, time);
   }
-  g.present(pvCtx);
-  const c = canvas.getContext('2d')!;
-  c.imageSmoothingEnabled = false;
-  c.drawImage(pvCanvas, 0, 0);
+  g.present(ctx);
 }
 
 function previewCanvas(item: Item) {
   const c = el('canvas', 'pv');
   c.width = PV_W;
   c.height = PV_H;
-  paintPreview(c, item, 0);
-  if (item.cat === 'skin' || item.cat === 'sword') animated.push({ canvas: c, item });
+  const ctx = cardCtx(c);
+  paintPreview(ctx, item, 0);
+  if (item.cat === 'skin' || item.cat === 'sword') {
+    animated.push({ canvas: c, ctx, item });
+    if (watcher) watcher.observe(c);
+    else onScreen.add(c);
+  }
   return c;
 }
 
 let animT = 0;
+let animAcc = 0;
+/** card previews are little loops: 15 frames a second is plenty, and only for cards in view */
 export function tickPreviews(dt: number) {
   animT += dt;
-  for (const a of animated) if (a.canvas.isConnected) paintPreview(a.canvas, a.item, animT);
-  for (let i = animated.length - 1; i >= 0; i--) if (!animated[i].canvas.isConnected) animated.splice(i, 1);
+  animAcc += dt;
+  if (animAcc < 1 / 15) return;
+  animAcc = 0;
+  for (let i = animated.length - 1; i >= 0; i--) {
+    const a = animated[i];
+    if (!a.canvas.isConnected) {
+      watcher?.unobserve(a.canvas);
+      animated.splice(i, 1);
+    } else if (onScreen.has(a.canvas)) paintPreview(a.ctx, a.item, animT);
+  }
 }
 
 // ---------------- stat lines ----------------
