@@ -112,7 +112,12 @@ npm run build    # dist/ 에 정적 빌드
 비밀번호는 PBKDF2(SHA-256, 100,000회)로 해시해 저장하고, 로그인 토큰도 해시로만 보관하며 30일 뒤 만료된다.
 비밀번호를 5번 틀리면 1분간 잠긴다. 테이블은 첫 요청 때 자동으로 만들어진다.
 
-### 연결 방법
+### 현재 배포
+- 계정 API: `https://parrycube-api.celesta.workers.dev` (Cloudflare Worker, `worker/`), D1 데이터베이스 `parrycube`.
+- 게임(GitHub Pages)은 `src/net/cloud.ts`의 `CLOUD_API`로 이 주소를 부른다.
+- 다시 배포: `cd worker && npx wrangler deploy`
+
+### 연결 방법 (Pages로 직접 올릴 때)
 1. Cloudflare 대시보드 → **Workers & Pages** → **Create** → **Pages** → **Connect to Git** → 이 저장소 선택
    - Production branch: `ccr-dd5f27cd-agud00` · Build command: `npm run build` · Build output directory: `dist`
 2. **Storage & Databases → D1** → **Create database** (이름 예: `parrycube`)

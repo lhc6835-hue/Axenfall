@@ -5,7 +5,7 @@ import { onPersist, progressOf, replaceProgress, save, type Save } from '../game
  * Where the API lives. Served from Cloudflare Pages, the game and the API share an origin and this stays ''.
  * For the GitHub Pages copy, put the Cloudflare Pages address here (e.g. 'https://parry-cube.pages.dev').
  */
-export const CLOUD_API: string = '';
+export const CLOUD_API: string = 'https://parrycube-api.celesta.workers.dev';
 
 const TOKEN_KEY = 'parrycube_token';
 const SYNC_KEY = 'parrycube_sync';

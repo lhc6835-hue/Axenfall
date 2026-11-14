@@ -8,4 +8,4 @@ workers_dev = true
 binding = "DB"
 database_name = "parrycube"
 # the id of the D1 database named "parrycube" (wrangler d1 list)
-database_id = "REPLACE_WITH_D1_ID"
+database_id = "5e9b314c-d741-432f-86b3-180d118bfe5e"
