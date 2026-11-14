@@ -6,7 +6,7 @@ import { PK } from './fx';
 
 export type EType =
   | 'grunt' | 'runner' | 'archer' | 'dasher' | 'brute' | 'caster' | 'warden' | 'overlord' | 'dummy'
-  | 'lancer' | 'shield' | 'sniper' | 'mortar' | 'splitter' | 'shard' | 'golem' | 'duelist';
+  | 'lancer' | 'shield' | 'sniper' | 'mortar' | 'splitter' | 'shard' | 'sawyer' | 'golem' | 'duelist';
 type EState = 'chase' | 'windup' | 'strike' | 'recover' | 'stun' | 'air';
 
 interface Spec {
@@ -38,13 +38,14 @@ export const SPECS: Record<EType, Spec> = {
   sniper: { r: 5, hp: 16, spd: 30, dmg: 14, range: 210, windup: 1.15, color: 0x5affa0, xp: 3, gold: 0.5, mass: 1 },
   mortar: { r: 6, hp: 26, spd: 24, dmg: 10, range: 180, windup: 0.8, color: 0xd0703a, xp: 3, gold: 0.55, mass: 1.6 },
   splitter: { r: 6, hp: 20, spd: 38, dmg: 9, range: 13, windup: 0.5, color: 0xff5ad0, xp: 1, gold: 0.3, mass: 1.2 },
+  sawyer: { r: 6, hp: 24, spd: 30, dmg: 10, range: 150, windup: 0.7, color: 0xffb43a, xp: 3, gold: 0.5, mass: 1.3 },
   shard: { r: 3.5, hp: 6, spd: 70, dmg: 6, range: 10, windup: 0.32, color: 0xff8ae0, xp: 1, gold: 0.1, mass: 0.6 },
   golem: { r: 18, hp: 3400, spd: 22, dmg: 26, range: 60, windup: 0.9, color: 0xff7a2a, xp: 80, gold: 220, mass: 40 },
   duelist: { r: 12, hp: 7200, spd: 56, dmg: 24, range: 40, windup: 0.5, color: 0xb08aff, xp: 150, gold: 520, mass: 30 },
 };
 
 const BOSSES: EType[] = ['warden', 'overlord', 'golem', 'duelist'];
-const RANGED: EType[] = ['archer', 'caster', 'sniper', 'mortar'];
+const RANGED: EType[] = ['archer', 'caster', 'sniper', 'mortar', 'sawyer'];
 const JABBER: EType[] = ['grunt', 'runner', 'splitter', 'shard'];
 
 /** the duelist's guard lasts this long before it answers with a cut */
@@ -90,6 +91,8 @@ export class Enemy {
   /** shield / guard reaction cooldown */
   guardCd = 0;
   lastPat = -1;
+  /** the sawyer's blade is out on the wing */
+  sawOut = 0;
   /** dummies in the lobby keep a fixed home */
   homeX = 0;
   homeY = 0;
@@ -175,7 +178,7 @@ export class Enemy {
         let mv = 1;
         if (ranged) {
           // hold a comfortable distance and strafe
-          const keep = this.type === 'archer' ? 105 : this.type === 'sniper' ? 165 : this.type === 'mortar' ? 140 : 125;
+          const keep = this.type === 'archer' ? 105 : this.type === 'sniper' ? 165 : this.type === 'mortar' ? 140 : this.type === 'sawyer' ? 115 : 125;
           mv = d > keep + 15 ? 1 : d < keep - 15 ? -0.8 : 0;
           const strafe = Math.sin(this.bob * 0.15 + this.id) * 0.6;
           this.x += (Math.cos(toP) * mv - Math.sin(toP) * strafe) * sp * dt;
@@ -188,6 +191,10 @@ export class Enemy {
         const inRange = charger ? d < s.range && d > 28 : this.type === 'lancer' ? d < s.range : ranged ? d < s.range + 40 : d < s.range + 4;
         // wait your turn: only a few enemies may attack at once, and ranged ones hold fire while the sky is busy
         const crowded = run.attackers() >= run.attackCap() || (ranged && run.hostileShots() >= run.shotCap() - 2);
+        if (this.sawOut > 0) {
+          this.sawOut -= dt;
+          if (this.cd <= 0) this.cd = 0.3;
+        }
         if (inRange && this.cd <= 0 && crowded) this.cd = rand(0.3, 0.7);
         else if (inRange && this.cd <= 0) {
           this.state = 'windup';
@@ -283,6 +290,7 @@ export class Enemy {
             : this.type === 'caster' ? rand(4.5, 6)
             : this.type === 'sniper' ? rand(4, 5.5)
             : this.type === 'mortar' ? rand(4.5, 6.2)
+            : this.type === 'sawyer' ? rand(1.6, 2.4)
             : this.type === 'lancer' ? rand(1.4, 2.2)
             : rand(1.0, 1.8);
         }
@@ -334,6 +342,13 @@ export class Enemy {
         run.fx.flare(mx, my, 5, 0xc0ffe0, 0.06);
         run.fx.light(mx, my, 30, s.color, 0.8, 0.1);
         sfx.enemyShot();
+        break;
+      }
+      case 'sawyer': {
+        // a spinning saw that flies out, slows, and comes back to the hand that threw it
+        run.sawShot(this, this.atk);
+        this.sawOut = 3.5;
+        sfx.swing('scythe');
         break;
       }
       case 'mortar': {
@@ -914,6 +929,21 @@ export class Enemy {
         if (wind) g.glow(tx2, ty2, 5 + k * 8, 0xff8a3a, 0.3 + k * 0.5);
         break;
       }
+      case 'sawyer': {
+        // a squat pentagon that carries its saw at its side until it throws it
+        const a = wind ? this.atk : f;
+        ngon(g, x, y, r + 1.5, 5, -Math.PI / 2, outline);
+        ngon(g, x, y, r, 5, -Math.PI / 2, body);
+        ngon(g, x - 0.5, y - 1.5, r * 0.45, 5, -Math.PI / 2, lite);
+        if (this.sawOut <= 0) {
+          // wound back over the shoulder during the windup
+          const ha = a + (wind ? -2.2 * k : -1.2) * (Math.cos(a) >= 0 ? 1 : -1);
+          const sx = x + Math.cos(ha) * (r + 3), sy = y + Math.sin(ha) * (r + 3);
+          drawSaw(g, sx, sy, 3.6, this.spin * (wind ? 3 : 0.6), flash ? 0xffffff : 0xd8dce4, c);
+          if (wind) g.glow(sx, sy, 8, c, 0.3 + k * 0.4);
+        }
+        break;
+      }
       case 'splitter': {
         const w = Math.sin(this.bob * 0.8) * 1;
         g.disc(x - 2, y, r * 0.8 + 1.2, outline);
@@ -1041,6 +1071,24 @@ function angleTo(a: number, b: number) {
   if (d > Math.PI) d -= TAU;
   if (d < -Math.PI) d += TAU;
   return d;
+}
+
+/** a spinning saw: toothed disc with a hub */
+export function drawSaw(g: Gfx, x: number, y: number, r: number, rot: number, c: number, hub: number) {
+  const n = 8;
+  for (let i = 0; i < n; i++) {
+    const a = rot + (i * TAU) / n;
+    g.tri(
+      x + Math.cos(a) * (r + 2), y + Math.sin(a) * (r + 2),
+      x + Math.cos(a + 0.55) * r, y + Math.sin(a + 0.55) * r,
+      x + Math.cos(a - 0.2) * r * 0.8, y + Math.sin(a - 0.2) * r * 0.8,
+      c,
+    );
+  }
+  g.disc(x, y, r + 0.6, 0x0c0a14);
+  g.disc(x, y, r, c);
+  g.disc(x, y, r * 0.45, hub);
+  g.disc(x, y, r * 0.18, 0x0c0a14);
 }
 
 function ngon(g: Gfx, x: number, y: number, r: number, n: number, rot: number, c: number, a = 1) {

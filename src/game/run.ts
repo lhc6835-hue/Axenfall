@@ -3,7 +3,7 @@ import { TAU, angDiff, clamp, hash2, mix, rand, randi } from '../engine/math';
 import { sfx } from '../engine/audio';
 import type { Input } from '../engine/input';
 import { FX, PK } from './fx';
-import { Enemy, type EType } from './enemies';
+import { Enemy, drawSaw, type EType } from './enemies';
 import { worldById, type WorldDef } from './worlds';
 import { Player } from './player';
 import { UPGRADES, baseMods, type GunDef, type Mods, type SkinDef, type SwordDef, type Upgrade } from './data';
@@ -24,7 +24,9 @@ export interface Shot {
   px: number;
   py: number;
   /** how it is drawn */
-  kind?: 'crescent' | 'blade';
+  kind?: 'crescent' | 'blade' | 'saw';
+  /** a boomerang: flies out, brakes, and homes back to the enemy that threw it */
+  boom?: { owner: Enemy; back: boolean; spin: number };
   /** lobbed shells fly over everything and burst where they land */
   lob?: { sx: number; sy: number; tx: number; ty: number; t: number; dur: number; n: number; z: number };
 }
@@ -433,6 +435,7 @@ export class Run {
   }
 
   reflect(s: Shot, perfect: boolean) {
+    if (s.boom) s.boom.owner.sawOut = 0;
     s.friendly = true;
     s.hit = new Set();
     s.pierce = perfect ? 4 : 2;
@@ -508,6 +511,16 @@ export class Run {
     this.shots.push({
       x: sx, y: sy, vx: 0, vy: 0, r: 3, dmg, life: dur + 1, friendly: false, c, pierce: 0, hit: null, px: sx, py: sy,
       lob: { sx, sy, tx, ty, t: 0, dur, n, z: 0 },
+    });
+  }
+
+  sawShot(e: Enemy, a: number) {
+    if (this.hostileShots() >= this.shotCap()) return;
+    const sp = 200;
+    const x = e.x + Math.cos(a) * (e.r + 3), y = e.y + Math.sin(a) * (e.r + 3);
+    this.shots.push({
+      x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, r: 4, dmg: e.dmg, life: 4, friendly: false, c: e.spec.color,
+      pierce: 0, hit: null, px: x, py: y, kind: 'saw', boom: { owner: e, back: false, spin: 0 },
     });
   }
 
@@ -774,6 +787,35 @@ export class Run {
           this.burst(s);
         }
         continue;
+      }
+      if (s.boom) {
+        const B = s.boom;
+        B.spin += dt * 24;
+        if (!s.friendly) {
+          if (!B.back) {
+            // braking on the way out
+            const sp = Math.hypot(s.vx, s.vy);
+            const ns = sp - 150 * dt;
+            if (ns <= 15) B.back = true;
+            else {
+              s.vx *= ns / sp;
+              s.vy *= ns / sp;
+            }
+          } else if (!B.owner.dead) {
+            // homing back to the thrower
+            const dx = B.owner.x - s.x, dy = B.owner.y - s.y, d = Math.hypot(dx, dy) || 1;
+            s.vx += ((dx / d) * 185 - s.vx) * Math.min(1, dt * 4);
+            s.vy += ((dy / d) * 185 - s.vy) * Math.min(1, dt * 4);
+            if (d < B.owner.r + 4) {
+              s.life = 0;
+              B.owner.sawOut = 0;
+              B.owner.cd = Math.max(B.owner.cd, rand(1.2, 2));
+              this.fx.sparks(s.x, s.y, Math.atan2(s.vy, s.vx), 0.8, 4, 80, s.c, 0xffffff, 0.15);
+              continue;
+            }
+          }
+          if (Math.random() < 0.3) this.fx.spawn(PK.Ember, s.x, s.y, rand(-20, 20), rand(-20, 20), 0.2, 0xffd080, { c2: 0xffffff });
+        }
       }
       s.px = s.x;
       s.py = s.y;
@@ -1088,6 +1130,14 @@ export class Run {
         g.arc(s.x - Math.cos(a) * 4, s.y - Math.sin(a) * 4, 7, 2.5, a - 1.2, a + 1.2, s.friendly ? 0xffe46a : s.c);
         g.arc(s.x - Math.cos(a) * 3, s.y - Math.sin(a) * 3, 7, 1, a - 0.9, a + 0.9, 0xffffff);
         g.glow(s.x, s.y, 16, s.c, 0.5);
+        continue;
+      }
+      if (s.kind === 'saw') {
+        // a motion streak behind, then the toothed disc
+        const sp = Math.hypot(s.vx, s.vy) || 1;
+        g.line(s.x - (s.vx / sp) * 7, s.y - (s.vy / sp) * 7, s.x, s.y, s.c, 0.5);
+        drawSaw(g, s.x, s.y, 4.4, s.boom ? s.boom.spin : this.clock * 24, s.friendly ? 0xffe46a : 0xd8dce4, s.c);
+        g.glow(s.x, s.y, 9, s.c, 0.25);
         continue;
       }
       if (s.kind === 'blade') {
