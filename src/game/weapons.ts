@@ -216,7 +216,7 @@ export class GunCtl {
       }
     } else if (this.ammo < 1 && this.burstLeft <= 0 && this.delayT < 0) {
       this.startReload();
-    } else if (t && this.cycle < 0 && this.burstLeft <= 0 && this.delayT < 0) {
+    } else if (t && this.cycle < 0 && this.burstLeft <= 0 && this.delayT < 0 && !run.noGun) {
       this.flourish = -1;
       // no shot while the rear hand is off reaching for the blade
       const aligned = Math.abs(angDiff(this.aim, want)) < 0.35 && !this.reaching;

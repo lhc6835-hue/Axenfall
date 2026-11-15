@@ -8,11 +8,14 @@ import {
 import { buy, catalog, checkTimedRestock, persist, priceOf, purchasable, rerollCost, reroll, resetSave, save, type ShopCat, type Slot } from '../game/save';
 import type { RunResult } from '../game/run';
 import { WORLDS } from '../game/worlds';
+import type { TutView } from '../game/tutorial';
 import { canFullscreen, enterFullscreen, exitFullscreen } from './fullscreen';
 import { cloud, errorText, signIn, signOut, syncNow, type ConflictChoice, type Summary, type SwitchInfo } from '../net/cloud';
 
 export interface AppApi {
   startRun(): void;
+  startTutorial(): void;
+  skipTutorial(): void;
   preview(o: { gun?: GunDef; sword?: SwordDef; skin?: SkinDef } | null): void;
   refreshDemo(): void;
   pickWorld(id: number): void;
@@ -285,13 +288,16 @@ export class UI {
         <button class="btn" data-a="shop">상점</button>
         <button class="btn" data-a="loadout">장비</button>
         <button class="btn ghost" data-a="opt">설정</button>
+        <button class="btn ghost tut-btn${!save.tutorial && save.runs === 0 ? ' fresh' : ''}" data-a="tut">튜토리얼</button>
       </div>
+      ${!save.tutorial && save.runs === 0 ? '<p class="tut-nudge">처음이라면 <b>튜토리얼</b>부터. 3분이면 패리까지 익힌다 · 완료 보상 <b class="coin"></b>300</p>' : ''}
       <div class="best">최고 기록 ${Math.floor(save.best.time / 60)}분 ${Math.floor(save.best.time % 60)}초 · 처치 ${save.best.kills} · 출격 ${save.runs}회</div>
       <div class="help">
         <b>이동</b> WASD · <b>베기/패리</b> 스페이스 · 마우스 클릭 · <b>대시</b> Shift · <b>재장전</b> R · <b>일시정지</b> Esc<br>
         총은 자동 사격 · 적의 <em>!</em> 신호에 맞춰 베면 패리 · 공격 직전에 베면 <em>PERFECT</em>
       </div>`;
     w.querySelector<HTMLElement>('[data-a=go]')!.onclick = () => { sfx.ui(); this.app.startRun(); };
+    w.querySelector<HTMLElement>('[data-a=tut]')!.onclick = () => { sfx.ui(); this.app.startTutorial(); };
     w.querySelectorAll<HTMLButtonElement>('.world').forEach((b) => {
       b.onclick = () => {
         if (b.disabled || b.classList.contains('sel')) return;
@@ -709,6 +715,56 @@ export class UI {
     };
     root().appendChild(m);
     m.querySelector<HTMLInputElement>('input[name=id]')!.focus();
+  }
+
+  // ---------------- tutorial ----------------
+  private tutKey = '';
+  /** the lesson card at the top of the screen, refreshed only when its text changes */
+  tutorial(v: TutView | null) {
+    let card = document.querySelector<HTMLElement>('.tut');
+    if (!v) {
+      card?.remove();
+      this.tutKey = '';
+      return;
+    }
+    const key = `${v.idx}|${v.progress}|${v.hint}|${v.cleared}`;
+    if (card && key === this.tutKey) return;
+    this.tutKey = key;
+    const fresh = !card || card.dataset.idx !== String(v.idx);
+    if (!card) {
+      card = el('div', 'tut');
+      document.getElementById('screens')!.appendChild(card);
+    }
+    card.dataset.idx = String(v.idx);
+    const dots = Array.from({ length: v.total }, (_, i) => `<i class="${i < v.idx ? 'done' : i === v.idx ? 'now' : ''}"></i>`).join('');
+    card.className = `tut${v.cleared ? ' cleared' : ''}${fresh ? ' enter' : ''}`;
+    card.innerHTML = `
+      <div class="tut-top"><span class="tut-step">${v.idx + 1} / ${v.total}</span><b class="tut-title">${v.title}</b>
+        ${v.progress ? `<span class="tut-prog">${v.progress}</span>` : ''}<button class="tut-skip" type="button">건너뛰기</button></div>
+      <p class="tut-body">${v.body}</p>
+      ${v.cleared ? '<p class="tut-ok">좋아! 다음 단계로</p>' : v.hint ? `<p class="tut-hint">${v.hint}</p>` : ''}
+      <div class="tut-dots">${dots}</div>`;
+    card.querySelector<HTMLElement>('.tut-skip')!.onclick = () => {
+      sfx.ui();
+      this.app.skipTutorial();
+    };
+  }
+
+  tutorialDone(reward: number, onDone: () => void) {
+    this.clear();
+    const m = el('div', 'modal');
+    m.innerHTML = `<div class="box">
+      <h2 class="win">튜토리얼 완료</h2>
+      <p class="sub">이동 · 자동 사격 · 베기 · 패리 · 반사 · PERFECT · 대시 · 레벨업</p>
+      ${reward ? `<div class="total"><b class="coin"></b> +${fmt(reward)} <span>보유 ${fmt(save.gold)}</span></div>` : ''}
+      <p class="sub">상점에서 무기를 사고, 출격해서 10분을 버티거나 최종 보스를 쓰러뜨리자.</p>
+      <button class="btn primary" data-a="ok">로비로</button>
+    </div>`;
+    m.querySelector<HTMLElement>('[data-a=ok]')!.onclick = () => {
+      sfx.ui();
+      onDone();
+    };
+    root().appendChild(m);
   }
 
   /** the last word before this device's progress is thrown away */

@@ -8,6 +8,7 @@ import { persist, restock, save } from './game/save';
 import { Run, type Loadout, type RunResult } from './game/run';
 import { drawHud, type Banner } from './ui/hud';
 import { WORLDS, worldById } from './game/worlds';
+import { Tutorial } from './game/tutorial';
 import { UI, tickPreviews } from './ui/ui';
 import { openFromBlack, slash, wiping } from './ui/transition';
 import { enterFullscreen, onFullscreenChange } from './ui/fullscreen';
@@ -90,6 +91,13 @@ function newDemo() {
 
 const ui = new UI({
   startRun,
+  startTutorial() {
+    if (wiping() || mode === 'play') return;
+    slash(() => beginRun(true));
+  },
+  skipTutorial() {
+    finishTutorial(false);
+  },
   preview(o) {
     previewOv = o;
     newDemo();
@@ -124,13 +132,16 @@ function startRun() {
   slash(beginRun);
 }
 
-function beginRun() {
+function beginRun(tutorial = false) {
   previewOv = null;
   mode = 'play';
   paused = false;
+  tutEnding = false;
   ui.clear();
   input.clearPresses();
-  run = new Run(g, loadout(), input, {
+  // the tutorial always takes place in the first world
+  const load = tutorial ? { ...loadout(), world: 1 } : loadout();
+  run = new Run(g, load, input, {
     levelUp(choices) {
       input.clearPresses();
       ui.levelUp(choices, run.upLv, (u) => {
@@ -138,16 +149,55 @@ function beginRun() {
         input.clearPresses();
       });
     },
-    over: finishRun,
+    over: tutorial ? () => finishTutorial(false) : finishRun,
     banner(text, sub = '', color = '#ffffff') {
       banner = { text, sub, color, t: 2.4 };
     },
   }, false, mouseWorld);
+  touchLayer.classList.toggle('on', isTouch);
+  if (tutorial) {
+    run.tutorial = new Tutorial(run, isTouch);
+    banner = null;
+    sfx.music('battle');
+    sfx.runStart();
+    return;
+  }
   const wd = run.world;
   banner = { text: `월드 ${wd.id} · ${wd.name}`, sub: '10분 생존 또는 최종 보스 처치', color: wd.id === 2 ? '#ffb070' : '#ffe46a', t: 2.4 };
   touchLayer.classList.toggle('on', isTouch);
   sfx.music(wd.music.battle);
   sfx.runStart();
+}
+
+let tutEnding = false;
+const TUTORIAL_REWARD = 300;
+
+/** the tutorial ends (cleared, skipped or quit): reward the first clear, then back to the lobby */
+function finishTutorial(done: boolean) {
+  if (tutEnding || !run.tutorial) return;
+  tutEnding = true;
+  // hold the world still behind the closing screens
+  run.choosing = true;
+  ui.tutorial(null);
+  touchLayer.classList.remove('on');
+  const reward = done && !save.tutorial ? TUTORIAL_REWARD : 0;
+  save.gold += reward;
+  save.tutorial = true;
+  persist();
+  sfx.music(null);
+  const back = () =>
+    slash(() => {
+      mode = 'lobby';
+      paused = false;
+      tutEnding = false;
+      sfx.music('lobby');
+      newDemo();
+      ui.lobby();
+    });
+  if (done) {
+    sfx.victory();
+    ui.tutorialDone(reward, back);
+  } else back();
 }
 
 function finishRun(r: RunResult) {
@@ -220,7 +270,12 @@ function step(now: number) {
     run.camY = panelSide === 'right' ? 2 : -4;
   }
   if (banner) banner.t -= dt;
-  if (mode === 'play' && !run.over) {
+  if (mode === 'play' && run.tutorial && !tutEnding) {
+    const v = run.tutorial.view;
+    ui.tutorial(paused ? null : v);
+    if (v.finished) finishTutorial(true);
+  }
+  if (mode === 'play' && !run.over && !run.tutorial) {
     const M = run.world.music;
     sfx.music(run.boss ? (run.boss.type === run.world.boss2.type ? M.boss2 : M.boss1) : M.battle);
   }

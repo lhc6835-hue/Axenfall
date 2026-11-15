@@ -21,6 +21,8 @@ export interface Save {
   cleared: number;
   /** the world picked in the lobby */
   world: number;
+  /** the tutorial has been finished or skipped */
+  tutorial: boolean;
   sound: boolean;
   music: boolean;
   fullscreen: boolean;
@@ -44,6 +46,7 @@ function fresh(): Save {
     runs: 0,
     cleared: 0,
     world: 1,
+    tutorial: false,
     sound: true,
     music: true,
     fullscreen: true,

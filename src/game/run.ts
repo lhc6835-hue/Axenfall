@@ -5,6 +5,7 @@ import type { Input } from '../engine/input';
 import { FX, PK } from './fx';
 import { Enemy, drawSaw, type EType } from './enemies';
 import { worldById, type WorldDef } from './worlds';
+import type { Tutorial } from './tutorial';
 import { Player } from './player';
 import { UPGRADES, baseMods, type GunDef, type Mods, type SkinDef, type SwordDef, type Upgrade } from './data';
 import type { SwordCtl } from './weapons';
@@ -107,6 +108,14 @@ export class Run {
   shots: Shot[] = [];
   waves: Wave[] = [];
   rifts: Rift[] = [];
+  /** a scripted lesson in place of the normal run */
+  tutorial: Tutorial | null = null;
+  /** the gun holds fire (tutorial: blade-only steps) */
+  noGun = false;
+  /** shockwaves passed through with a dash */
+  dashDodges = 0;
+  /** hits the player took (tutorial hints) */
+  hitsTaken = 0;
   /** the enemy whose update is running: anything it fires is marked as its own */
   private shooter: Enemy | null = null;
   drops: Drop[] = [];
@@ -334,10 +343,12 @@ export class Run {
     // fewer, meaner enemies: each one is worth more
     const bounty = e.boss ? 1 : 2;
     const xp = e.spec.xp * (e.elite ? 5 : 1) * bounty;
-    if (xp > 0) this.drop(e.x, e.y, 'xp', xp);
+    // the tutorial hands out experience only in its level-up lesson
+    const drops = !this.tutorial || this.tutorial.idx === 7;
+    if (xp > 0 && drops) this.drop(e.x, e.y, 'xp', xp);
     const gc = e.spec.gold * (e.elite ? 12 : 1) * bounty * this.world.gold;
     let goldN = Math.floor(gc) + (Math.random() < gc % 1 ? 1 : 0);
-    if (goldN > 0) {
+    if (goldN > 0 && drops) {
       const pieces = Math.min(goldN, e.boss ? 30 : 6);
       for (let i = 0; i < pieces; i++) this.drop(e.x, e.y, 'gold', Math.round(goldN / pieces));
     }
@@ -644,6 +655,9 @@ export class Run {
   hurtPlayer(dmg: number, fromAng: number) {
     const p = this.player;
     if (this.demo || p.inv > 0 || p.dead || this.over) return;
+    this.hitsTaken++;
+    // nobody dies in the tutorial
+    if (this.tutorial) dmg = Math.min(dmg, Math.max(0, p.hp - 1));
     p.hp -= dmg;
     p.inv = 0.75;
     p.hurtFlash = 0.3;
@@ -860,6 +874,7 @@ export class Run {
     const p = this.player;
     if (!this.over) this.time += dt;
     if (this.demo) this.demoUpdate(dt);
+    else if (this.tutorial) this.tutorial.update(dt);
     else if (!this.over) this.director(dt);
     p.update(dt, this.demo ? null : this.input, this.clock);
 
@@ -1011,7 +1026,8 @@ export class Run {
 
     // camera follows with a little lead toward where the gun points
     const lead = 10;
-    const tx = p.x + Math.cos(p.gun.aim) * lead, ty = p.y + Math.sin(p.gun.aim) * lead;
+    // in the tutorial the lesson card sits at the top: frame the player a little lower
+    const tx = p.x + Math.cos(p.gun.aim) * lead, ty = p.y + Math.sin(p.gun.aim) * lead - (this.tutorial ? 16 : 0);
     this.camX += (tx - this.camX) * Math.min(1, dt * 7);
     this.camY += (ty - this.camY) * Math.min(1, dt * 7);
     if (this.demo) {
@@ -1035,7 +1051,10 @@ export class Run {
       if (Math.abs(d - w.r) > 4) continue;
       w.hit = true;
       // dashing through the crest is safe
-      if (p.inv > 0) continue;
+      if (p.inv > 0) {
+        if (p.dashT > 0 || p.dashCd > 0.7) this.dashDodges++;
+        continue;
+      }
       const a = Math.atan2(w.y - p.y, w.x - p.x);
       if (p.sword.guards(a)) {
         const s = p.sword;
@@ -1109,6 +1128,7 @@ export class Run {
     g.clear(this.world.id === 2 ? 0x120d0b : 0x14121f);
     this.drawFloor();
     this.fx.drawBack(g);
+    this.tutorial?.drawFloor(g, this.clock);
     this.drawWaves();
     this.drawRifts();
     this.drawLobMarks();
@@ -1128,6 +1148,7 @@ export class Run {
     if (!drawnPlayer && !p.dead) p.draw(g, this.clock);
     this.drawShots();
     this.fx.draw(g);
+    this.tutorial?.drawOver(g, this.clock);
     g.present(ctx);
   }
 

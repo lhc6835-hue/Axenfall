@@ -388,3 +388,49 @@ button { font-family: inherit; cursor: pointer; }
 .pick span { display: flex; justify-content: space-between; }
 .pick i { font-style: normal; color: var(--dim); }
 .pick em { font-style: normal; font-size: 11px; color: #8a80b8; margin-top: 4px; }
+
+/* ---------- tutorial ---------- */
+.tut-btn.fresh { color: #8ff3ff; border-color: #3a8a9a; box-shadow: 0 3px 0 #0a0814, 0 0 16px #8ff3ff55; animation: tutpulse 1.6s ease-in-out infinite; }
+@keyframes tutpulse { 50% { box-shadow: 0 3px 0 #0a0814, 0 0 26px #8ff3ff88; } }
+.tut-nudge { margin: 8px 0 0; font-size: 12px; color: #9fd8e8; }
+.tut-nudge b { color: #bff8ff; font-weight: normal; }
+.tut {
+  position: fixed; left: 50%; top: max(30px, 5.5vh); transform: translateX(-50%); z-index: 6;
+  width: min(560px, calc(100vw - 32px)); padding: 9px 14px 10px; pointer-events: none;
+  background: linear-gradient(180deg, rgba(14, 20, 34, .94), rgba(10, 12, 24, .92));
+  border: 2px solid #2e5a6a; border-radius: 6px; box-shadow: 0 6px 22px #0009, 0 0 18px #8ff3ff22;
+  color: var(--ink); font-size: 13px; line-height: 1.55;
+}
+.tut.enter { animation: tutin .32s cubic-bezier(.2, .9, .2, 1.1) both; }
+@keyframes tutin { from { opacity: 0; transform: translate(-50%, -12px) scale(.97); } }
+.tut.cleared { border-color: #6affd0; box-shadow: 0 6px 22px #0009, 0 0 22px #6affd044; }
+.tut-top { display: flex; align-items: center; gap: 8px; }
+.tut-step { font-size: 11px; color: #6aa8b8; letter-spacing: .08em; }
+.tut-title { font-family: 'Galmuri11B', monospace; font-weight: normal; font-size: 16px; color: #bff8ff; }
+.tut-prog { margin-left: auto; font-size: 12px; color: #ffe08a; background: #2a2210; border: 1px solid #6a5420; border-radius: 3px; padding: 0 6px; }
+.tut-skip { pointer-events: auto; margin-left: 8px; font-size: 11px; color: var(--dim); background: transparent; border: 1px solid #3a3260; border-radius: 3px; padding: 2px 8px; }
+.tut-top .tut-prog + .tut-skip { margin-left: 8px; }
+.tut-top .tut-title + .tut-skip { margin-left: auto; }
+.tut-body { margin: 5px 0 0; color: #dfe8f4; }
+.tut-body b { color: #ffffff; font-weight: normal; text-decoration: underline; text-decoration-color: #8ff3ff88; text-underline-offset: 3px; }
+.tut-body b.warn, .tut-hint b.warn { color: #ff5a6a; text-decoration: none; font-family: 'Galmuri11B', monospace; }
+.tut-body b.gold { color: #ffe46a; text-decoration: none; }
+.tut-body b.blue { color: #6ac8ff; }
+.tut kbd { font-family: inherit; font-size: 11px; color: #0e0b18; background: #dfe8f4; border-radius: 3px; padding: 0 5px; box-shadow: 0 2px 0 #6a7088; margin: 0 1px; }
+.tut-hint { margin: 6px 0 0; font-size: 12px; color: #ffcf8a; background: #2a1a0e; border-left: 3px solid #ff9a50; padding: 3px 8px; animation: tuthint .25s both; }
+@keyframes tuthint { from { opacity: 0; transform: translateY(-4px); } }
+.tut-ok { margin: 6px 0 0; font-family: 'Galmuri11B', monospace; color: #6affd0; }
+.tut-dots { display: flex; gap: 5px; margin-top: 7px; }
+.tut-dots i { flex: 1; height: 3px; border-radius: 2px; background: #2a2a44; }
+.tut-dots i.done { background: #6affd0; }
+.tut-dots i.now { background: #8ff3ff; box-shadow: 0 0 6px #8ff3ff; }
+@media (max-height: 500px) {
+  /* phones: clear of the pause button, narrower, tighter */
+  .tut { top: 46px; width: min(520px, calc(100vw - 200px)); padding: 4px 9px 5px; font-size: 10.5px; line-height: 1.4; }
+  .tut-title { font-size: 12.5px; }
+  .tut-step { font-size: 10px; }
+  .tut-prog, .tut-skip { font-size: 10px; padding: 0 5px; }
+  .tut-body { margin-top: 2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .tut-hint, .tut-ok { margin-top: 3px; font-size: 10.5px; padding: 1px 6px; }
+  .tut-dots { display: none; }
+}

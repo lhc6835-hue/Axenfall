@@ -74,11 +74,14 @@ export function drawHud(ctx: CanvasRenderingContext2D, run: Run, W: number, H: n
   txt(ctx, `${Math.ceil(p.hp)} / ${m.maxHp}`, 41, 19.5, 5.5, '#ffffff', 'center');
 
   // timer + next event
-  txt(ctx, mmss(run.time), W / 2, 11, 10, '#ffffff', 'center');
+  if (run.tutorial) {
+    // the lesson card sits at the top; no clock or boss countdown
+    txt(ctx, '튜토리얼', W / 2, 11, 7, '#8ff3ff', 'center');
+  } else txt(ctx, mmss(run.time), W / 2, 11, 10, '#ffffff', 'center');
   let next = '';
   if (!run.bossDone[0] && run.time < BOSS1_AT) next = `보스까지 ${mmss(BOSS1_AT - run.time)}`;
   else if (!run.bossDone[1] && run.time < BOSS2_AT && !run.boss) next = `최종 보스까지 ${mmss(BOSS2_AT - run.time)}`;
-  if (next) txt(ctx, next, W / 2, 21, 5.5, '#a89ccf', 'center');
+  if (next && !run.tutorial) txt(ctx, next, W / 2, 21, 5.5, '#a89ccf', 'center');
 
   // gold & kills
   ctx.fillStyle = '#ffc23a';

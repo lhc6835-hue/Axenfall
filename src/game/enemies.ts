@@ -93,6 +93,11 @@ export class Enemy {
   lastPat = -1;
   /** the sawyer's blade is out on the wing */
   sawOut = 0;
+  /** tutorial controls: never attacks / never moves / fixed rest between attacks / slower windup */
+  passive = false;
+  still = false;
+  cdFix = 0;
+  wuMul = 1;
   /** dummies in the lobby keep a fixed home */
   homeX = 0;
   homeY = 0;
@@ -142,6 +147,11 @@ export class Enemy {
     this.y += this.ky * dt;
     this.kx *= kd;
     this.ky *= kd;
+    if (this.passive) {
+      // a practice target: it just stands and takes it
+      this.face = Math.atan2(p.y - this.y, p.x - this.x);
+      return;
+    }
     if (this.type === 'dummy') {
       this.x += (this.homeX - this.x) * Math.min(1, dt * 3);
       this.y += (this.homeY - this.y) * Math.min(1, dt * 3);
@@ -183,9 +193,14 @@ export class Enemy {
           const strafe = Math.sin(this.bob * 0.15 + this.id) * 0.6;
           this.x += (Math.cos(toP) * mv - Math.sin(toP) * strafe) * sp * dt;
           this.y += (Math.sin(toP) * mv + Math.cos(toP) * strafe) * sp * dt;
-        } else {
+        } else if (!this.still) {
           this.x += Math.cos(toP) * sp * dt;
           this.y += Math.sin(toP) * sp * dt;
+        }
+        if (this.still && ranged) {
+          // stay put (undo the strafe)
+          this.x = this.homeX;
+          this.y = this.homeY;
         }
         this.face = toP;
         const inRange = charger ? d < s.range && d > 28 : this.type === 'lancer' ? d < s.range : ranged ? d < s.range + 40 : d < s.range + 4;
@@ -207,7 +222,7 @@ export class Enemy {
       }
       case 'windup': {
         // melee units keep tracking a little; the dasher locks in late
-        const wu0 = s.windup * (this.elite ? 0.9 : 1);
+        const wu0 = s.windup * (this.elite ? 0.9 : 1) * this.wuMul;
         const track = charger
           ? this.t < wu0 * 0.6 ? 1 : 0
           : this.type === 'lancer'
@@ -221,7 +236,7 @@ export class Enemy {
           this.x -= Math.cos(this.atk) * 12 * dt;
           this.y -= Math.sin(this.atk) * 12 * dt;
         }
-        const wu = s.windup * (this.elite ? 0.9 : 1);
+        const wu = s.windup * (this.elite ? 0.9 : 1) * this.wuMul;
         if (this.t >= wu) {
           this.state = 'strike';
           this.t = 0;
@@ -286,7 +301,8 @@ export class Enemy {
           this.state = 'chase';
           this.t = 0;
           this.cd =
-            this.type === 'archer' ? rand(3.2, 4.6)
+            this.cdFix ? this.cdFix
+            : this.type === 'archer' ? rand(3.2, 4.6)
             : this.type === 'caster' ? rand(4.5, 6)
             : this.type === 'sniper' ? rand(4, 5.5)
             : this.type === 'mortar' ? rand(4.5, 6.2)
@@ -787,7 +803,7 @@ export class Enemy {
   draw(g: Gfx, time: number) {
     const s = this.spec;
     const wind = this.state === 'windup';
-    const k = wind ? clamp(this.t / s.windup, 0, 1) : 0;
+    const k = wind ? clamp(this.t / (s.windup * this.wuMul), 0, 1) : 0;
     let c = s.color;
     if (this.state === 'stun') c = mix(c, 0x6a6a7a, 0.5);
     const flash = this.flash > 0;
