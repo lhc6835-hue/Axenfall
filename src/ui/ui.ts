@@ -136,7 +136,7 @@ function swordStats(d: SwordDef, lvl = 0) {
     ['사거리', `${d.reach}`],
     ['쿨타임', `${d.cooldown}초`],
     ['패리', `${d.parry.toFixed(2)}초`],
-    ...(d.wave ? [['검기', `${Math.round(d.wave * 100)}%`]] : []),
+    ...(d.wave ? [[d.waveKind === 'rift' ? '균열' : d.waveKind === 'stars' ? '별 조각' : '검기', `${Math.round(d.wave * 100)}%${d.waveKind === 'stars' ? '×3' : ''}`]] : []),
   ];
 }
 const statHtml = (rows: string[][]) => `<div class="stats">${rows.map(([k, v]) => `<span><i>${k}</i>${v}</span>`).join('')}</div>`;

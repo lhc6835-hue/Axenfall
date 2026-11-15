@@ -24,7 +24,7 @@ export interface Shot {
   px: number;
   py: number;
   /** how it is drawn */
-  kind?: 'crescent' | 'blade' | 'saw';
+  kind?: 'crescent' | 'blade' | 'saw' | 'star';
   /** the enemy that fired it: a parried shot is sent back to it */
   owner?: Enemy;
   /** a parried shot steers into this enemy */
@@ -33,6 +33,18 @@ export interface Shot {
   boom?: { owner: Enemy; back: boolean; spin: number };
   /** lobbed shells fly over everything and burst where they land */
   lob?: { sx: number; sy: number; tx: number; ty: number; t: number; dur: number; n: number; z: number };
+}
+
+/** a tear in space: a thin crack first, then it rips open and cuts everything along it */
+interface Rift {
+  x: number;
+  y: number;
+  a: number;
+  len: number;
+  dmg: number;
+  c: number;
+  t: number;
+  done: boolean;
 }
 
 /** an expanding shockwave ring; parried by facing it, or dashed through */
@@ -94,6 +106,7 @@ export class Run {
   enemies: Enemy[] = [];
   shots: Shot[] = [];
   waves: Wave[] = [];
+  rifts: Rift[] = [];
   /** the enemy whose update is running: anything it fires is marked as its own */
   private shooter: Enemy | null = null;
   drops: Drop[] = [];
@@ -525,6 +538,65 @@ export class Run {
     });
   }
 
+  /** the void blade: a crack opens ahead, across the line of the cut, and tears a beat later */
+  rift(px: number, py: number, a: number, dmg: number, c: number) {
+    const d = 44;
+    this.rifts.push({ x: px + Math.cos(a) * d, y: py + Math.sin(a) * d, a: a + Math.PI / 2, len: 56, dmg, c, t: 0, done: false });
+  }
+
+  /** the star blade: three shards burst out in a fan, hang, then each hunts its own enemy */
+  starShards(px: number, py: number, a: number, dmg: number, c: number) {
+    const taken = new Set<Enemy>();
+    for (let i = 0; i < 3; i++) {
+      const sa = a + (i - 1) * 0.7;
+      const x = px + Math.cos(sa) * 8, y = py + Math.sin(sa) * 8;
+      // pick the nearest enemy not already hunted by a sibling
+      let best: Enemy | undefined, bd = 260 * 260;
+      for (const e of this.enemies) {
+        if (e.dead || taken.has(e) || e.spawnT > 0.2) continue;
+        const d2 = (e.x - x) ** 2 + (e.y - y) ** 2;
+        if (d2 < bd) {
+          bd = d2;
+          best = e;
+        }
+      }
+      if (best) taken.add(best);
+      const sp = 150;
+      this.shots.push({
+        x, y, vx: Math.cos(sa) * sp, vy: Math.sin(sa) * sp, r: 3, dmg, life: 1.4, friendly: true, c, pierce: 0,
+        hit: new Set(), px: x, py: y, kind: 'star', home: best, owner: undefined,
+      });
+    }
+    this.fx.flare(px + Math.cos(a) * 8, py + Math.sin(a) * 8, 7, 0xffffff, 0.07);
+  }
+
+  private updateRifts(dt: number) {
+    for (const r of this.rifts) {
+      r.t += dt;
+      if (!r.done && r.t >= 0.16) {
+        r.done = true;
+        const ca = Math.cos(r.a), sa = Math.sin(r.a);
+        const x0 = r.x - ca * r.len / 2, y0 = r.y - sa * r.len / 2;
+        for (const e of this.enemies) {
+          if (e.dead) continue;
+          // distance from the enemy to the tear
+          const ux = e.x - x0, uy = e.y - y0;
+          const k = Math.max(0, Math.min(r.len, ux * ca + uy * sa));
+          const d = Math.hypot(e.x - (x0 + ca * k), e.y - (y0 + sa * k));
+          if (d < e.r + 5) this.damageEnemy(e, r.dmg, -sa * 90, ca * 90, false, 'sword');
+        }
+        for (let i = 0; i < 10; i++) {
+          const k = (i / 9 - 0.5) * r.len;
+          this.fx.sparks(r.x + ca * k, r.y + sa * k, r.a + Math.PI / 2 * (i % 2 ? 1 : -1), 0.6, 2, 120, r.c, 0xffffff, 0.25);
+        }
+        this.fx.light(r.x, r.y, 70, r.c, 1.1, 0.2);
+        this.shake(3);
+        sfx.play('slam2', { vol: 0.3, rate: 1.8, gate: 50 });
+      }
+    }
+    this.rifts = this.rifts.filter((r) => r.t < 0.42);
+  }
+
   /** a flying crescent thrown off a cut */
   bladeWave(px: number, py: number, a: number, dmg: number, c: number) {
     const x = px + Math.cos(a) * 10, y = py + Math.sin(a) * 10;
@@ -817,7 +889,19 @@ export class Run {
         }
         continue;
       }
-      if (s.friendly && s.home) {
+      if (s.kind === 'star') {
+        // the burst brakes first, then the shard turns on its quarry
+        const age = 1.4 - s.life;
+        if (age < 0.16) {
+          s.vx *= Math.exp(-dt * 9);
+          s.vy *= Math.exp(-dt * 9);
+        } else if (s.home && !s.home.dead) {
+          const dx = s.home.x - s.x, dy = s.home.y - s.y, d = Math.hypot(dx, dy) || 1;
+          s.vx += ((dx / d) * 260 - s.vx) * Math.min(1, dt * 7);
+          s.vy += ((dy / d) * 260 - s.vy) * Math.min(1, dt * 7);
+        }
+        if (Math.random() < 0.6) this.fx.spawn(PK.Star, s.x, s.y, rand(-10, 10), rand(-10, 10), rand(0.15, 0.3), s.c, { s: rand(1, 2) });
+      } else if (s.friendly && s.home) {
         const h = s.home;
         if (h.dead) s.home = undefined;
         else {
@@ -888,6 +972,7 @@ export class Run {
     }
     this.shots = this.shots.filter((s) => s.life > 0);
     this.updateWaves(dt);
+    this.updateRifts(dt);
 
     // drops
     const mag = this.mods.magnet;
@@ -1025,6 +1110,7 @@ export class Run {
     this.drawFloor();
     this.fx.drawBack(g);
     this.drawWaves();
+    this.drawRifts();
     this.drawLobMarks();
     this.drawDrops();
     for (const e of this.enemies) e.drawFloor(g, this.clock);
@@ -1062,6 +1148,29 @@ export class Run {
         const a = (i / n) * TAU;
         if (!isNaN(w.cut) && Math.abs(angDiff(a, w.cut)) < gap) continue;
         g.glow(w.x + Math.cos(a) * w.r, w.y + Math.sin(a) * w.r, 7, w.c, 0.18 * fade);
+      }
+    }
+  }
+
+  private drawRifts() {
+    const g = this.g;
+    for (const r of this.rifts) {
+      const ca = Math.cos(r.a), sa = Math.sin(r.a);
+      const h = r.len / 2;
+      const x0 = r.x - ca * h, y0 = r.y - sa * h, x1 = r.x + ca * h, y1 = r.y + sa * h;
+      if (!r.done) {
+        // a hairline crack growing outward from the middle, flickering
+        const k = Math.min(1, r.t / 0.16);
+        const gx = ca * h * k, gy = sa * h * k;
+        g.line(r.x - gx, r.y - gy, r.x + gx, r.y + gy, Math.sin(this.clock * 80) > 0 ? 0xffffff : r.c);
+        g.glowLine(r.x - gx, r.y - gy, r.x + gx, r.y + gy, 3, r.c, 0.3 + k * 0.3);
+      } else {
+        // torn open: a dark gash with a bright rim that closes up again
+        const f = 1 - (r.t - 0.16) / 0.26;
+        const w = 4 * f;
+        g.beam(x0, y0, x1, y1, w + 2, r.c, f);
+        g.beam(x0, y0, x1, y1, Math.max(1, w), 0x0a0614, f);
+        g.glowLine(x0, y0, x1, y1, 8, r.c, 0.6 * f);
       }
     }
   }
@@ -1169,6 +1278,17 @@ export class Run {
         g.arc(s.x - Math.cos(a) * 4, s.y - Math.sin(a) * 4, 7, 2.5, a - 1.2, a + 1.2, s.c);
         g.arc(s.x - Math.cos(a) * 3, s.y - Math.sin(a) * 3, 7, 1, a - 0.9, a + 0.9, 0xffffff);
         g.glow(s.x, s.y, 16, s.c, 0.5);
+        continue;
+      }
+      if (s.kind === 'star') {
+        // a spinning four-point star
+        const rot = this.clock * 14 + s.x * 0.1;
+        for (let i = 0; i < 4; i++) {
+          const a = rot + (i * Math.PI) / 2;
+          g.tri(s.x + Math.cos(a) * 5, s.y + Math.sin(a) * 5, s.x + Math.cos(a + 0.8) * 1.6, s.y + Math.sin(a + 0.8) * 1.6, s.x + Math.cos(a - 0.8) * 1.6, s.y + Math.sin(a - 0.8) * 1.6, 0xffffff);
+        }
+        g.disc(s.x, s.y, 1.6, s.c);
+        g.glow(s.x, s.y, 12, s.c, 0.55);
         continue;
       }
       if (s.kind === 'saw') {

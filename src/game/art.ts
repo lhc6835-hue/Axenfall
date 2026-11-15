@@ -183,11 +183,13 @@ export function drawGun(x: Xf, kind: GunLook, p: GunPose, time: number) {
       x.q(13, -5.4, 1.2, 4.4, K.brass);
       x.q(0, -1.4, 14, 2, K.woodL); // forestock
       // the harpoon: head out of the muzzle when loaded, pushed down the barrel while reloading
-      const out = p.rod < 0 ? 4 : (1 - p.rod) * 16;
-      x.q(19, -3.6, out, 0.9, 0xd8c8a0);
-      x.tri(19 + out, -4.7, 19 + out, -2, 22.5 + out, -3.3, K.light);
-      x.tri(19 + out, -4.7, 20.5 + out, -3.3, 18.2 + out, -5.8, K.steel);
-      x.tri(19 + out, -2, 20.5 + out, -3.3, 18.2 + out, -0.8, K.steel);
+      if (p.rod <= 1.5) {
+        const out = p.rod < 0 ? 4 : (1 - p.rod) * 16;
+        x.q(19, -3.6, out, 0.9, 0xd8c8a0);
+        x.tri(19 + out, -4.7, 19 + out, -2, 22.5 + out, -3.3, K.light);
+        x.tri(19 + out, -4.7, 20.5 + out, -3.3, 18.2 + out, -5.8, K.steel);
+        x.tri(19 + out, -2, 20.5 + out, -3.3, 18.2 + out, -0.8, K.steel);
+      }
       const [hx, hy] = x.pt(-2.5, -5);
       const H = new Xf(x.g, hx, hy, x.ang + (-0.9 + p.hammer * 1.5) * x.fy, x.fy);
       H.q(-0.5, -3, 1.2, 3, K.dark);

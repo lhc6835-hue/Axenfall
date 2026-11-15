@@ -605,6 +605,39 @@ export class GunCtl {
         }
         break;
       case 'musket':
+        if (gunLook(this.def) === 'harpoon') {
+          if (at(0.1)) sfx.foley('belt', 0.6, 0.8);
+          if (at(0.3)) sfx.foley('breech', 0.8, 0.75);
+          if (at(0.42) || at(0.54)) sfx.foley('sheathe', 0.55, 0.65);
+          if (at(0.66)) sfx.foley('click', 0.6, 0.6);
+          if (at(0.86)) {
+            this.hammer = 1;
+            sfx.foley('lever', 0.9, 0.8);
+            this.kickV += 22;
+          }
+          break;
+        }
+        if (gunLook(this.def) === 'blunder') {
+          if (at(0.16)) {
+            const [x, y] = X.pt(20, -3.4);
+            for (let i = 0; i < 6; i++) fx.spawn(PK.Dust, x, y, rand(-10, 10), rand(-10, 5), rand(0.3, 0.6), 0x3a3430, { s: rand(1, 2), drag: 5 });
+            sfx.foley('sheathe', 0.3, 0.7);
+          }
+          // shot rattles into the bell a few pellets at a time
+          for (const k of [0.4, 0.46, 0.52]) {
+            if (at(k)) {
+              const [x, y] = X.pt(21, -3.4);
+              for (let i = 0; i < 4; i++) fx.spawn(PK.Spark, x, y, rand(-12, 12), rand(-6, 8), rand(0.15, 0.3), 0x9a9aa8, { s: 1 });
+              sfx.foley('casing1', 0.45, 1.3 + Math.random() * 0.2);
+            }
+          }
+          if (at(0.66) || at(0.75)) sfx.foley('click', 0.5, 0.75);
+          if (at(0.9)) {
+            this.hammer = 1;
+            sfx.foley('hammer', 0.9);
+          }
+          break;
+        }
         if (at(0.12)) {
           // powder poured down the muzzle
           const [x, y] = X.pt(27, -3);
@@ -851,6 +884,45 @@ export class GunCtl {
           break;
         }
         case 'musket': {
+          const look = gunLook(this.def);
+          if (look === 'harpoon') {
+            // dipped a little, the rear hand fetches a harpoon from the hip, feeds it shaft-first into the
+            // muzzle until only the head shows, ties the line on, and hauls the cocking lever back
+            const dip = sm(0, 0.1) * (1 - sm(0.86, 0.96));
+            rot += 0.22 * dip;
+            du -= 1.5 * dip;
+            if (u < 0.3) {
+              p.rod = 2; // empty
+              if (u > 0.08) {
+                const k = sm(0.08, 0.3);
+                hand2 = [lerp(-6, 34, k), lerp(1.5, -3.3, k) - Math.sin(k * Math.PI) * 4];
+              }
+            } else if (u < 0.62) {
+              p.rod = 0.75 * sm(0.3, 0.62);
+              const out = (1 - p.rod) * 16;
+              hand2 = [19 + out - 1, -3.3];
+            } else {
+              p.rod = 0.75;
+              if (u < 0.72) hand2 = [lerp(22, -5, sm(0.62, 0.7)), lerp(-3.3, 1, sm(0.62, 0.7))];
+              else if (u < 0.92) hand2 = [-2.5 - sm(0.74, 0.86) * 2.5, -6];
+            }
+            break;
+          }
+          if (look === 'blunder') {
+            // muzzle up; powder, then a handful of shot poured into the bell, two short tamps, lower, cock
+            const up = sm(0, 0.12) * (1 - sm(0.8, 0.9));
+            rot += -1.2 * up;
+            du -= 2.5 * up;
+            if (u > 0.12 && u < 0.6) {
+              const shake = Math.sin(u * 90) * 0.6;
+              hand2 = [22 + shake, u < 0.38 ? -5.5 : -6.5];
+            } else if (u >= 0.6 && u < 0.8) {
+              const depth = 0.25 + 0.45 * Math.abs(Math.sin(((u - 0.6) / 0.2) * Math.PI * 2));
+              p.rod = depth;
+              hand2 = [35 - depth * 14 + 0.5, -3.6];
+            }
+            break;
+          }
           // muzzle up, powder, ramrod out, three strokes, ramrod home, lower, cock
           const up = sm(0, 0.1) * (1 - sm(0.76, 0.86));
           rot += -1.15 * up;
@@ -1026,6 +1098,26 @@ interface Move {
 }
 const S = Math.PI;
 /** each sword's combo; quick follow-ups walk through it, a pause starts over */
+/**
+ * Weapons with their own combo, overriding the one their kind shares. Heavy heads (hammer, axe) are
+ * not swung round from behind like a blade: they go up overhead and come down on the target.
+ */
+const MOVES_LOOK: Partial<Record<SwordLook, Move[]>> = {
+  hammer: [
+    // hoisted overhead, brought straight down onto the target
+    { m: 'arc', dir: 'down', span: 1.9, bias: -0.15, cock: 0.3, rIn: 4, rOut: 10, bulge: 1, tw: 1.1 },
+    // an upward swing back through, head first
+    { m: 'arc', dir: 'up', span: 1.7, bias: -0.1, cock: 0.2, rIn: 5, rOut: 10, bulge: 1 },
+    // the big one: raised high, a pause at the top, then the whole weight comes down
+    { m: 'arc', dir: 'down', span: 2.2, bias: -0.1, cock: 0.55, rIn: 3, rOut: 10, tw: 1.6, ts: 1.15, dmg: 1.8, fin: true },
+  ],
+  axe: [
+    { m: 'arc', dir: 'down', span: 1.6, bias: -0.1, cock: 0.35, rIn: 5, rOut: 9, bulge: 1 },
+    { m: 'arc', dir: 'alt', span: 1.7, bias: -0.05, cock: 0.25, rIn: 6, rOut: 9, bulge: 2 },
+    { m: 'arc', dir: 'down', span: 2.0, bias: -0.1, cock: 0.6, rIn: 4, rOut: 9, tw: 1.4, dmg: 1.6, fin: true },
+  ],
+};
+
 const MOVES: Record<SwordKind, Move[]> = {
   dagger: [
     { m: 'arc', dir: 'rest', span: 2.0, rIn: 7, rOut: 10, bulge: 2 },
@@ -1250,7 +1342,7 @@ export class SwordCtl {
   attack(a: number) {
     const canCancel = this.state === 'rest' || this.state === 'recover' || (this.state === 'deflect' && this.t > 0.1);
     if (this.cd > 0 || !canCancel) return false;
-    const list = MOVES[this.def.kind];
+    const list = MOVES_LOOK[swordLook(this.def)] ?? MOVES[this.def.kind];
     // keep the combo going on quick follow-ups, start over after a pause
     this.comboIdx = this.sinceAttack < 0.75 ? (this.comboIdx + 1) % list.length : 0;
     const mv = list[this.comboIdx];
@@ -1586,7 +1678,12 @@ export class SwordCtl {
           if (mv.hop === 1) this.hop = 1;
           if (mo === 'whip') this.resetChain();
           if (this.run.player) this.run.player.swingFeel(this.aim, this.side, !!HEAVY[k], !!mv.fin);
-          if (def.wave) this.run.bladeWave(px, py, this.aim, this.dmg() * def.wave * (mv.dmg ?? 1), def.color);
+          if (def.wave) {
+            const wd = this.dmg() * def.wave * (mv.dmg ?? 1);
+            if (def.waveKind === 'rift') this.run.rift(px, py, this.aim, wd, def.color);
+            else if (def.waveKind === 'stars') this.run.starShards(px, py, this.aim, wd, def.color);
+            else this.run.bladeWave(px, py, this.aim, wd, def.color);
+          }
         }
         break;
       }
@@ -1833,13 +1930,15 @@ export class SwordCtl {
     const k = def.kind;
     const mv = this.move;
     if ((k === 'greatsword' || k === 'cleaver') && mv.dir === 'down' && mv.span < 6) {
+      const big = mv.fin && swordLook(def) === 'hammer';
       const a = this.aim + this.endRel();
       const r = this.reach() * 0.85;
       const x = px + Math.cos(a) * r, y = py + Math.sin(a) * r;
       fx.dust(x, y, k === 'cleaver' ? 6 : 10);
-      fx.ring(x, y, 3, k === 'cleaver' ? 12 : 18, 0.3, 0xc8b8a0, 2, 0.6);
+      fx.ring(x, y, 3, big ? 34 : k === 'cleaver' ? 12 : 18, big ? 0.4 : 0.3, 0xc8b8a0, big ? 3 : 2, 0.6);
+      if (big) fx.ring(x, y, 2, 20, 0.25, 0xffffff, 2, 0.6);
       fx.shards(x, y, k === 'cleaver' ? 4 : 6, 0x6a6278, 0x3a3448, 0.8);
-      this.run.shake(k === 'cleaver' ? 2 : 3);
+      this.run.shake(big ? 6 : k === 'cleaver' ? 2 : 3);
       if (k === 'greatsword') sfx.slam();
       else sfx.foley('slam2', 0.5, 1.3);
     }

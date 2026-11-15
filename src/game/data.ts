@@ -202,8 +202,10 @@ export interface SwordDef {
   id: string;
   kind: SwordKind;
   look?: SwordLook;
-  /** each cut also throws a flying crescent for this share of the blade's damage */
+  /** each cut also lets loose something for this share of the blade's damage */
   wave?: number;
+  /** what it lets loose: a delayed rift that splits the space ahead, or homing star shards */
+  waveKind?: 'rift' | 'stars';
   name: string;
   rarity: Rarity;
   price: number;
@@ -340,13 +342,13 @@ export const SWORDS: SwordDef[] = [
   },
   {
     id: 's_void', kind: 'katana', look: 'voidblade', name: '공허의 검', rarity: 'mythic', price: 44000,
-    desc: '칼집에서 뽑을 때마다 공간이 갈라져 검기가 날아간다.', hold: '허리 칼집 · 발도술',
-    dmg: 52, reach: 35, arc: 3.6, windup: 0.02, swing: 0.055, hold_: 0.14, recover: 0.28, cooldown: 0.62, parry: 0.2, knock: 150, stop: 0.07, color: 0xb08aff, wave: 0.7,
+    desc: '벨 때마다 앞쪽 공간에 균열이 생겼다가 한 박자 뒤에 찢어지며 그 선 위의 적을 모두 벤다.', hold: '허리 칼집 · 발도술',
+    dmg: 52, reach: 35, arc: 3.6, windup: 0.02, swing: 0.055, hold_: 0.14, recover: 0.28, cooldown: 0.62, parry: 0.2, knock: 150, stop: 0.07, color: 0xb08aff, wave: 0.9, waveKind: 'rift',
   },
   {
     id: 's_star', kind: 'plasma', look: 'starblade', name: '별의 검', rarity: 'transcendent', price: 90000,
-    desc: '별빛으로 된 칼날. 벨 때마다 빛의 검기가 적을 꿰뚫으며 날아간다.', hold: '허리 · 점화 베기',
-    dmg: 60, reach: 38, arc: 3.2, windup: 0.03, swing: 0.07, hold_: 0.04, recover: 0.2, cooldown: 0.4, parry: 0.24, knock: 140, stop: 0.06, color: 0xfff0a8, wave: 0.9,
+    desc: '별빛으로 된 칼날. 벨 때마다 별 조각 세 개가 흩어졌다가 각자 적을 쫓아간다.', hold: '허리 · 점화 베기',
+    dmg: 60, reach: 38, arc: 3.2, windup: 0.03, swing: 0.07, hold_: 0.04, recover: 0.2, cooldown: 0.4, parry: 0.24, knock: 140, stop: 0.06, color: 0xfff0a8, wave: 0.45, waveKind: 'stars',
   },
 ];
 
