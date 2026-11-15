@@ -186,6 +186,16 @@ function finishRun(r: RunResult) {
 // ---------------- loop ----------------
 let last = performance.now();
 function frame(now: number) {
+  // a thrown error must not stop the loop: schedule the next frame first
+  requestAnimationFrame(frame);
+  try {
+    step(now);
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function step(now: number) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
 
@@ -229,7 +239,6 @@ function frame(now: number) {
     (window as any).__swords = SWORDS;
     (window as any).__guns = GUNS;
   }
-  requestAnimationFrame(frame);
 }
 
 // audio needs a user gesture
