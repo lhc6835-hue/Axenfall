@@ -372,6 +372,11 @@ button { font-family: inherit; cursor: pointer; }
 .field input { font-family: inherit; font-size: 15px; color: var(--ink); background: #0e0b18; border: 2px solid #3a3260; border-radius: 4px; padding: 8px 10px; outline: none; }
 .field input:focus { border-color: #ffd23a; }
 .form-note { font-size: 11px; color: #6a6090; margin: 2px 0 0; line-height: 1.5; }
+.form-warn { font-size: 12px; line-height: 1.55; color: #ffcf8a; background: #2a1a0e; border: 1px solid #6a3a1a; border-radius: 4px; padding: 7px 9px; margin: 4px 0 0; }
+.form-warn b { color: #ffe08a; font-weight: normal; }
+.confirm-switch .warn-big { color: #ffcf8a; font-size: 14px; margin: 6px 0 10px; }
+.confirm-switch .sum { font-size: 12px; color: #c8c0e0; margin: 4px 2px 10px; line-height: 1.5; }
+.confirm-switch .lose-sum { color: #ff9aa8; text-decoration: line-through; text-decoration-color: #ff5a6a88; }
 .form-err { min-height: 1.2em; font-size: 12px; color: #ff8a9a; margin: 0; }
 .acct-info { display: flex; justify-content: space-between; font-size: 13px; padding: 4px 2px; border-bottom: 1px dashed #2a2440; }
 .acct-info span { color: var(--dim); }

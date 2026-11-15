@@ -44,8 +44,9 @@ let applying = false;
 let onConflict: ((c: ConflictChoice) => void) | null = null;
 
 const base = () => {
-  if (location.hostname.endsWith('github.io')) return CLOUD_API.replace(/\/$/, '');
-  return CLOUD_API ? CLOUD_API.replace(/\/$/, '') : '';
+  // local development talks to `wrangler pages dev` through the Vite proxy
+  if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') return '';
+  return CLOUD_API.replace(/\/$/, '');
 };
 const usable = () => !(location.hostname.endsWith('github.io') && !CLOUD_API);
 
@@ -235,12 +236,60 @@ export async function initCloud() {
   }
 }
 
-export async function signIn(mode: 'login' | 'signup', id: string, pw: string) {
+export interface SwitchInfo {
+  mode: 'login' | 'signup';
+  /** what this device has now */
+  local: Summary;
+  /** what the account holds (login only; null when the account has nothing saved yet) */
+  account: Summary | null;
+}
+
+/**
+ * Sign in or sign up, then make this device follow the account: a new account starts from scratch,
+ * an existing one replaces whatever this device had with its saved progress. When the device has
+ * progress of its own, `confirm` is asked first; declining signs straight back out.
+ */
+export async function signIn(mode: 'login' | 'signup', id: string, pw: string, confirm: (info: SwitchInfo) => Promise<boolean>) {
   const r = await api(mode, { method: 'POST', body: JSON.stringify({ id, pw }) });
   store(TOKEN_KEY, String(r.token));
+  let cloudData: Partial<Save> | null = null;
+  let rev = 0;
+  let updated = 0;
+  try {
+    if (mode === 'login') {
+      const sv = await api('save');
+      cloudData = (sv.data as Partial<Save> | null) ?? null;
+      rev = Number(sv.rev) || 0;
+      updated = Number(sv.updated) || 0;
+    }
+    if (!isFresh(save)) {
+      const ok = await confirm({ mode, local: summarize(save), account: cloudData ? summarize(cloudData, updated) : null });
+      if (!ok) throw new ApiError('cancelled', 0);
+    }
+  } catch (e) {
+    // back out cleanly: this device keeps what it had
+    try {
+      await api('logout', { method: 'POST' });
+    } catch {
+      /* the token is dropped locally either way */
+    }
+    store(TOKEN_KEY, null);
+    throw e;
+  }
   user = String(r.id);
-  meta = { user, rev: 0, at: 0 };
-  await reconcile();
+  meta = { user, rev, at: Date.now() };
+  store(SYNC_KEY, meta);
+  if (cloudData) {
+    adopt(cloudData);
+    return 'loaded' as const;
+  }
+  // a brand-new account (or one with nothing saved): a clean start, saved to the account at once
+  applying = true;
+  replaceProgress({});
+  applying = false;
+  window.dispatchEvent(new Event('parrycube:progress'));
+  await push(true);
+  return 'fresh' as const;
 }
 
 export async function signOut() {
@@ -270,6 +319,7 @@ export function errorText(e: unknown) {
       bad_login: '아이디 또는 비밀번호 불일치',
       locked: '로그인 시도 초과. 1분 후 다시 시도',
       network: '서버 연결 실패',
+      cancelled: '취소함. 이 기기의 진행은 그대로',
       no_server: '서버 미연결',
       no_database: '서버 데이터베이스 미연결',
     } as Record<string, string>

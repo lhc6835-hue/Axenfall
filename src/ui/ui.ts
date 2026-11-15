@@ -9,7 +9,7 @@ import { buy, catalog, checkTimedRestock, persist, priceOf, purchasable, rerollC
 import type { RunResult } from '../game/run';
 import { WORLDS } from '../game/worlds';
 import { canFullscreen, enterFullscreen, exitFullscreen } from './fullscreen';
-import { cloud, errorText, signIn, signOut, syncNow, type ConflictChoice, type Summary } from '../net/cloud';
+import { cloud, errorText, signIn, signOut, syncNow, type ConflictChoice, type Summary, type SwitchInfo } from '../net/cloud';
 
 export interface AppApi {
   startRun(): void;
@@ -675,6 +675,7 @@ export class UI {
       <label class="field"><span>비밀번호</span><input name="pw" type="password" maxlength="64" autocomplete="${signup ? 'new-password' : 'current-password'}" required></label>
       ${signup ? '<label class="field"><span>비밀번호 확인</span><input name="pw2" type="password" maxlength="64" autocomplete="new-password" required></label>' : ''}
       <p class="form-note">${signup ? '아이디: 영문·숫자·밑줄 3~16자 (대소문자 구분 없음) · 비밀번호: 6자 이상' : '로그인하면 진행 상황이 클라우드에 저장된다'}</p>
+      <p class="form-warn">${signup ? '새 계정은 <b>처음부터</b> 시작한다. 이 기기에 쌓인 골드·무기·스킨·기록은 사라진다.' : '로그인하면 이 기기의 진행이 <b>계정에 저장된 진행</b>으로 바뀐다. 이 기기에만 있던 골드·무기·기록은 사라진다.'}</p>
       <p class="form-err" role="alert"></p>
       <button class="btn primary" type="submit">${signup ? '가입하기' : '로그인'}</button>
       <button class="btn ghost" type="button" data-a="close">닫기</button>
@@ -696,10 +697,10 @@ export class UI {
       btn.disabled = true;
       err.textContent = '';
       try {
-        await signIn(mode, id, pw);
+        const how = await signIn(mode, id, pw, (info) => this.confirmSwitch(info));
         sfx.buy();
         m.remove();
-        this.toast(signup ? `${cloud.user} 가입 완료` : `${cloud.user} 로그인`);
+        this.toast(signup ? `${cloud.user} 가입 완료 · 처음부터 시작` : how === 'loaded' ? `${cloud.user} 로그인 · 계정 진행 불러옴` : `${cloud.user} 로그인 · 저장된 진행 없음, 처음부터 시작`);
       } catch (x) {
         sfx.deny();
         err.textContent = errorText(x);
@@ -708,6 +709,33 @@ export class UI {
     };
     root().appendChild(m);
     m.querySelector<HTMLInputElement>('input[name=id]')!.focus();
+  }
+
+  /** the last word before this device's progress is thrown away */
+  private confirmSwitch(info: SwitchInfo): Promise<boolean> {
+    return new Promise((resolve) => {
+      const m = el('div', 'modal acct-modal confirm-switch');
+      const line = (s: Summary) =>
+        `골드 ${fmt(s.gold)} · 무기 ${s.weapons}개 · 스킨 ${s.skins}개 · 출격 ${s.runs}회 · 최고 ${Math.floor(s.bestTime / 60)}분 ${Math.floor(s.bestTime % 60)}초`;
+      const signup = info.mode === 'signup';
+      m.innerHTML = `<div class="box small">
+        <h2 class="lose">주의</h2>
+        <p class="warn-big">${signup ? '새 계정은 처음부터 시작한다.' : info.account ? '이 기기의 진행이 계정에 저장된 진행으로 바뀐다.' : '이 계정에는 저장된 진행이 없다. 처음부터 시작한다.'}</p>
+        <div class="acct-info"><span>사라지는 진행 (이 기기)</span></div>
+        <p class="sum lose-sum">${line(info.local)}</p>
+        ${info.account ? `<div class="acct-info"><span>불러올 진행 (계정)</span></div><p class="sum">${line(info.account)}</p>` : ''}
+        <button class="btn primary" data-a="go">계속</button>
+        <button class="btn ghost" data-a="no">취소</button>
+      </div>`;
+      const done = (v: boolean) => {
+        sfx.ui();
+        m.remove();
+        resolve(v);
+      };
+      m.querySelector<HTMLElement>('[data-a=go]')!.onclick = () => done(true);
+      m.querySelector<HTMLElement>('[data-a=no]')!.onclick = () => done(false);
+      root().appendChild(m);
+    });
   }
 
   accountPanel() {
