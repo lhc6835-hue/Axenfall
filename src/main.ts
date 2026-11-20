@@ -238,11 +238,18 @@ let last = performance.now();
 function frame(now: number) {
   // a thrown error must not stop the loop: schedule the next frame first
   requestAnimationFrame(frame);
+  // dev tooling can take over the clock to render exact frames (trailers, thumbnails)
+  if (import.meta.env.DEV && (window as any).__manual) return;
   try {
     step(now);
   } catch (e) {
     console.error(e);
   }
+}
+
+if (import.meta.env.DEV) {
+  /** advance the whole app by exactly dt seconds and draw it */
+  (window as any).__step = (dt: number) => step(last + dt * 1000);
 }
 
 function step(now: number) {

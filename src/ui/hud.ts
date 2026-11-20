@@ -56,6 +56,8 @@ export function drawHud(ctx: CanvasRenderingContext2D, run: Run, W: number, H: n
     ctx.globalAlpha = 1;
   }
   if (run.demo) return;
+  // cinematic capture: only the in-world pops (damage numbers, PERFECT!) stay
+  if (import.meta.env.DEV && (globalThis as any).__cine) return;
   const p = run.player;
   const m = run.mods;
 
